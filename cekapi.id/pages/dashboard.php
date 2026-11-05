@@ -29,17 +29,17 @@ include __DIR__ . '/partials/sidebar.php';
         <div class="state" data-state-text>-</div>
       </article>
 
-      <article class="card card--api" id="card-api" data-state="aman">
-        <h3>Api</h3>
-        <div class="row"><div class="pic" style="margin:auto;color:#d62d20"><?= icon('flame', 76) ?></div></div>
-        <div class="state" data-state-text>-</div>
-      </article>
+     <article class="card card--api" id="card-api" data-state="aman">
+  <h3>Api</h3>
+  <div class="row"><div class="pic" style="margin:auto"><?= icon('flame', 64) ?></div></div>
+  <div class="state" data-state-text>-</div>
+</article>
 
       <article class="card card--asap" id="card-asap" data-state="aman">
         <h3>Asap</h3>
         <div class="row">
           <div class="val"><span data-val>--</span> <small>ppm</small></div>
-          <div class="pic" style="color:#111"><?= icon('cloud', 54) ?></div>
+          <div class="pic" style="color:#fff"><?= icon('cloud', 54) ?></div>
         </div>
         <div class="state" data-state-text>-</div>
       </article>
@@ -57,15 +57,23 @@ include __DIR__ . '/partials/sidebar.php';
     <div class="dash-grid">
       <section aria-labelledby="ttl-grafik">
         <div class="chart-head">
-          <div>
-            <h2 class="sub" id="ttl-grafik" style="margin-top:0">Grafik Pemantauan</h2>
-            <p style="margin:-6px 0 12px;font:400 1.05rem var(--font-head)">Grafik sensor suhu, asap, dan gas</p>
-          </div>
-          <div class="seg" role="group" aria-label="Rentang grafik">
-            <button type="button" data-range="live" aria-pressed="true">Live</button>
-            <button type="button" data-range="week" aria-pressed="false">7 Hari</button>
-          </div>
-        </div>
+  <div>
+    <h2 class="sub" id="ttl-grafik" style="margin-top:0">Grafik Pemantauan</h2>
+    <p style="margin:-6px 0 12px;font:400 1.05rem var(--font-head)">Grafik sensor suhu, asap, dan gas</p>
+    
+    <!-- Dropdown Filter Sensor pengganti legend -->
+   <select id="sensor-filter" style="padding: 6px 14px; border-radius: 999px; border: 1px solid #7c190f; background: #8b1e12; color: #fff; font: 600 0.85rem var(--font-head); cursor: pointer;">
+  <option value="all" style="background: #fff; color: #111;">Semua Sensor</option>
+  <option value="suhu" style="background: #fff; color: #111;">Suhu (°C)</option>
+  <option value="asap" style="background: #fff; color: #111;">Asap (ppm)</option>
+  <option value="gas" style="background: #fff; color: #111;">Gas (%)</option>
+</select>
+  </div>
+  <div class="seg" role="group" aria-label="Rentang grafik">
+    <button type="button" data-range="live" aria-pressed="true">Live</button>
+    <button type="button" data-range="week" aria-pressed="false">7 Hari</button>
+  </div>
+</div>
         <div class="chart-box"><canvas id="chart" aria-label="Grafik suhu, asap, dan gas" role="img"></canvas></div>
       </section>
 
@@ -76,6 +84,10 @@ include __DIR__ . '/partials/sidebar.php';
             <thead><tr><th>Alat</th><th>Waktu Kejadian</th><th>Tingkat Bahaya</th><th>Pesan</th></tr></thead>
             <tbody id="incidents"><tr><td class="empty" colspan="4">Memuat…</td></tr></tbody>
           </table>
+          <div class="tbl-footer" style="display: flex; gap: 8px; justify-content: flex-end;">
+      <button type="button" id="btn-prev" class="pg-btn">&laquo; Back</button>
+      <button type="button" id="btn-next" class="pg-btn">Next &raquo;</button>
+    </div>
         </div>
       </section>
     </div>

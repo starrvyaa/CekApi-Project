@@ -3,23 +3,92 @@
 .ctrl-panel{background:var(--amber-400);border-radius:34px;padding:22px 30px 26px}
 .ctrl{margin-bottom:20px}
 .ctrl-label{margin:0 0 10px;font:500 clamp(1.1rem,1.7vw,1.55rem)/1.25 var(--font-head)}
-.toggle{display:inline-flex;align-items:center;justify-content:space-between;gap:12px;width:154px;height:50px;
-  padding:0 8px 0 18px;border:2px solid #111;border-radius:999px;background:#fff;color:#111;cursor:pointer;
-  font:500 1.3rem var(--font-head)}
-.toggle .knob{width:34px;height:34px;border-radius:50%;background:#e62727;flex:none}
+.toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    width: 125px;
+    height: 42px;
+    padding: 0 7px 0 14px;
+    border: 2px solid #111;
+    border-radius: 999px;
+    background: #fff;
+    color: #111;
+    cursor: pointer;
+    font: 500 1.1rem var(--font-head);
+}
+.toggle .knob {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #e62727;
+    flex: none;
+}
 .toggle[aria-checked="true"]{flex-direction:row}
 .toggle[aria-checked="true"] .knob{background:#74e22a}
-.toggle[aria-checked="false"]{flex-direction:row-reverse;padding:0 18px 0 8px}
-.ctrl-foot{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-top:8px}
-.ctrl-note{margin:0;max-width:330px;font:500 .85rem/1.4 var(--font-body);color:#4a3200}
+.toggle[aria-checked="false"] {
+    flex-direction: row-reverse;
+    padding: 0 14px 0 7px;
+}
+.ctrl-foot {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+}
+.ctrl-note {
+    margin: 0;
+    max-width: 450px;
+    font: 500 1.0rem/1.4 var(--font-body);
+    color: #4a3200;
+}
 .btn-save{background:var(--orange-500);border:0;border-radius:999px;padding:10px 26px;color:#fff;
   font:600 1.05rem var(--font-head);letter-spacing:.06em;cursor:pointer}
 .btn-save:disabled{opacity:.6;cursor:wait}
 .btn-save:hover:not(:disabled){filter:brightness(1.08)}
 
-.warn-card{display:flex;align-items:center;gap:30px;background:var(--orange-500);color:#fff;border-radius:30px;padding:26px 36px}
-.warn-card .num{font:700 3rem/1 var(--font-head)}
-.warn-card .txt{font:500 clamp(1.3rem,2vw,1.9rem) var(--font-head)}
+.warn-card {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    background: var(--orange-500);
+    color: #fff;
+    border-radius: 30px;
+    padding: 40px 36px;
+}
+
+.warn-summary {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: 20px;
+    width: 100%;
+}
+
+.warn-summary svg {
+    flex-shrink: 0;
+}
+
+.warn-summary .num {
+    font: 700 2rem/1 var(--font-head);
+    flex-shrink: 0;
+}
+
+.warn-summary .txt {
+    font: 500 1.3rem var(--font-head);
+    white-space: nowrap;
+}
+
+.warn-description {
+    margin: 0;
+    font: 400 1rem/1.4 var(--font-body);
+    color: #fff;
+}
 .iot-grid h3.sub{margin:28px 0 14px;font:500 clamp(1.15rem,1.8vw,1.6rem) var(--font-head)}
 .act-log{background:#a33a42;color:#fff;border-radius:30px;padding:24px 34px;min-height:220px}
 .act-log ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
@@ -28,3 +97,55 @@
 .act-log .empty{margin:0;font:300 1.1rem var(--font-head)}
 
 @media (max-width:1000px){.iot-grid{grid-template-columns:1fr;gap:28px}}
+
+#ttl-panel {
+    font-size: 26px;
+}
+
+.ctrl-label {
+    font-size: 20px;
+}
+
+.iot-grid h2.col-title {
+    font-size: 26px;
+}
+
+.iot-grid h3.sub {
+    font-size: 18px;
+}
+
+/* Mengatur tinggi kedua kolom */
+.iot-grid {
+    align-items: stretch;
+}
+
+/* Mengatur susunan isi setiap kolom */
+.iot-grid > section {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Membuat kotak kuning memanjang */
+.ctrl-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 300px;
+}
+
+/* Memindahkan tombol simpan ke kanan bawah */
+.ctrl-foot {
+    margin-top: auto;
+    justify-content: flex-end;
+    padding-top: 20px;
+}
+
+/* Membuat kotak merah memanjang */
+.act-log {
+    flex: 1;
+    min-height: 300px;
+}
+
+.iot-grid h3.sub {
+    font-size: 18px;
+}

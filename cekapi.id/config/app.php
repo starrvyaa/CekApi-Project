@@ -8,7 +8,7 @@
 date_default_timezone_set('Asia/Jakarta');
 
 // URL dasar project
-define('BASE_URL', '/cekapi.id');
+define('BASE_URL', '/CekApi-Project/cekapi.id');
 
 // API Key ESP32
 // Samakan dengan API_KEY pada firmware ESP32

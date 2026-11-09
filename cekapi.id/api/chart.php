@@ -14,25 +14,25 @@ try {
     $labels = $suhu = $asap = $gas = [];
 
     if ($range === 'live') {
-        $rows = db()->query('SELECT created_at, suhu, asap, gas FROM sensor_logs ORDER BY id DESC LIMIT 30')->fetchAll();
+        $rows = db()->query('SELECT waktu_rekam, suhu, kadar_asap, kadar_gas FROM data_sensor ORDER BY id_log DESC LIMIT 30')->fetchAll();
         foreach (array_reverse($rows) as $r) {
-            $labels[] = date('H:i:s', strtotime($r['created_at']));
+            $labels[] = date('H:i:s', strtotime($r['waktu_rekam']));
             $suhu[]   = $r['suhu'] === null ? null : (float) $r['suhu'];
-            $asap[]   = $r['asap'] === null ? null : (int) $r['asap'];
-            $gas[]    = $r['gas'] === null ? null : (int) $r['gas'];
+            $asap[]   = $r['kadar_asap'] === null ? null : (int) $r['kadar_asap'];
+            $gas[]    = $r['kadar_gas'] === null ? null : (float) $r['kadar_gas'];
         }
     } else {
         $rows = db()->query(
-            'SELECT DATE(created_at) AS tgl, AVG(suhu) AS suhu, AVG(asap) AS asap, AVG(gas) AS gas
-               FROM sensor_logs
-              WHERE created_at >= (CURDATE() - INTERVAL 6 DAY)
-              GROUP BY DATE(created_at) ORDER BY tgl'
+            'SELECT DATE(waktu_rekam) AS tgl, AVG(suhu) AS suhu, AVG(kadar_asap) AS asap, AVG(kadar_gas) AS gas
+               FROM data_sensor
+              WHERE waktu_rekam >= (CURDATE() - INTERVAL 6 DAY)
+              GROUP BY DATE(waktu_rekam) ORDER BY tgl'
         )->fetchAll();
         foreach ($rows as $r) {
             $labels[] = $hari[(int) date('N', strtotime($r['tgl']))] . ' ' . date('d/m', strtotime($r['tgl']));
             $suhu[]   = $r['suhu'] === null ? null : round((float) $r['suhu'], 1);
             $asap[]   = $r['asap'] === null ? null : (int) round((float) $r['asap']);
-            $gas[]    = $r['gas'] === null ? null : (int) round((float) $r['gas']);
+            $gas[]    = $r['gas'] === null ? null : round((float) $r['gas'], 1);
         }
     }
 

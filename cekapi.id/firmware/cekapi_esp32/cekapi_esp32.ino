@@ -1,297 +1,478 @@
-/*
- * CEKAPI.id - Firmware ESP32 DevKit V1
- * --------------------------------------------------------------
- * Sensor  : Inframerah/flame (api), MQ-2 (asap & gas), DHT11 (suhu & kelembaban)
- * Aktuator: LED, Buzzer, Kipas (via relay)
- *
- * Library (Library Manager Arduino IDE):
- *   - "DHT sensor library" oleh Adafruit  (+ "Adafruit Unified Sensor")
- * Board  : "ESP32 Dev Module"  (paket esp32 by Espressif, versi 2.x atau 3.x)
- *
- * Alur:
- *   - loop() (core 1)  : baca sensor tiap 1 dtk, tentukan level bahaya, atur aktuator.
- *                        Aktuator TETAP bekerja walau WiFi / server mati.
- *   - netTask (core 0) : kirim data ke server tiap SEND_INTERVAL_MS, lalu terima
- *                        status LED/Buzzer/Kipas yang diatur dari dashboard.
- *
- * Wiring (lihat README.md untuk detail):
- *   DHT11 DATA -> GPIO4        MQ-2 AO -> GPIO34 (WAJIB lewat pembagi tegangan)
- *   Flame DO   -> GPIO27       LED     -> GPIO18 (+ resistor 220 ohm)
- *   Buzzer     -> GPIO19       Relay IN-> GPIO23
- */
+
 #include <WiFi.h>
-#include <WiFiClientSecure.h>
 #include <HTTPClient.h>
+#include <WiFiClient.h>
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
 #include <DHT.h>
-#include <math.h>
 
-// ===================== KONFIGURASI (WAJIB DIUBAH) =====================
-const char* WIFI_SSID  = "NAMA_WIFI";
-const char* WIFI_PASS  = "PASSWORD_WIFI";
-// XAMPP lokal : http://<IP-komputer>/cekapi.id/api/receive.php   (bukan localhost!)
-// Hosting     : https://domainanda.com/api/receive.php
-const char* SERVER_URL = "http://192.168.1.10/cekapi.id/api/receive.php";
-const char* API_KEY    = "GANTI_DENGAN_KUNCI_RAHASIA_PANJANG";   // samakan dgn config/app.php
-const char* DEVICE_ID  = "ESP32-01";
+// ==================================================
+// KONFIGURASI WIFI DAN SERVER CEKAPI.ID
+// ==================================================
 
-const unsigned long SEND_INTERVAL_MS = 5000;
+const char* WIFI_SSID     = "HMJTI";
+const char* WIFI_PASSWORD = "HM-JTi99";
 
-// ===================== PIN & POLARITAS =====================
-const uint8_t PIN_DHT    = 4;
-const uint8_t PIN_MQ2    = 34;   // ADC1 (aman dipakai bersama WiFi)
-const uint8_t PIN_FLAME  = 27;
-const uint8_t PIN_LED    = 18;
-const uint8_t PIN_BUZZER = 19;
-const uint8_t PIN_RELAY  = 23;
-#define DHTTYPE DHT11
+// Ganti IP berikut dengan IPv4 komputer yang menjalankan Laragon.
+const char* SERVER_URL =
+  "http://10.10.3.104/CekApi-Project/cekapi.id/api/sensor/store.php";
 
-const bool FLAME_ACTIVE_LOW  = true;   // kebanyakan modul flame: DO = LOW saat api
-const bool RELAY_ACTIVE_LOW  = true;   // kebanyakan modul relay: IN = LOW -> aktif
-const bool BUZZER_ACTIVE_LOW = false;  // buzzer aktif (active buzzer) umumnya HIGH = bunyi
+// Samakan dengan API_KEY di config/app.php.
+const char* API_KEY = "CEKAPI_ESP32_2026_Rahasia_9xK7pQ2m";
 
-// ===================== MQ-2 =====================
-const float MQ2_VCC        = 5.0;      // MQ-2 diberi daya 5V (pin VIN)
-const float MQ2_RL_KOHM    = 5.0;      // resistor beban di modul (cek modul Anda: 5k atau 10k)
-const float DIVIDER_RATIO  = 1.667;    // pembagi AO->ADC: R1=10k (atas), R2=15k (bawah) => (10+15)/15
-const float MQ2_CLEAN_AIR  = 9.83;     // Rs/R0 di udara bersih (datasheet MQ-2)
-const unsigned long MQ2_WARMUP_MS = 30000;  // pemanasan awal (idealnya lebih lama)
+// Ganti dengan id_alat yang benar-benar terdaftar di tabel alat.
+const int ID_ALAT = 1;
 
-// ===================== AMBANG BATAS (samakan dgn config/app.php) =====================
-const float TH_SUHU_WASPADA = 35.0, TH_SUHU_BAHAYA = 45.0;   // derajat C
-const int   TH_ASAP_WASPADA = 1000, TH_ASAP_BAHAYA = 2000;   // ppm
-const int   TH_GAS_WASPADA  = 20,   TH_GAS_BAHAYA  = 50;     // persen
+// Kirim data setiap 2 detik.
+// Kirim data setiap 10 detik (10000 ms) atau 1 menit (60000 ms).
+const unsigned long INTERVAL_KIRIM = 60000;
+const unsigned long INTERVAL_WIFI = 10000;
 
-// ===================== STATE =====================
-DHT dht(PIN_DHT, DHTTYPE);
-SemaphoreHandle_t dataMutex;
+// ==================================================
+// OLED
+// ==================================================
 
-float suhu = NAN, kelembaban = NAN;
-int   asapPpm = 0, gasPct = 0;
-bool  api = false;
-int   lvlSuhu = 0, lvlAsap = 0, lvlGas = 0, lvlApi = 0, lvlAll = 0;   // 0 aman, 1 waspada, 2 bahaya
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+#define OLED_RESET -1
+#define OLED_ADDRESS 0x3C
 
-volatile bool webBuzzer = false, webLed = false, webKipas = false;   // perintah dari dashboard
-float mq2R0 = 10.0;
-bool  mq2Ready = false;
-int   dhtFail = 0;
-unsigned long lastSense = 0, lastDht = 0, lastWifiTry = 0;
+Adafruit_SSD1306 display(
+  SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET
+);
 
-// ===================== UTIL =====================
-int levelOf(float v, float waspada, float bahaya) {
-  if (isnan(v)) return 0;
-  if (v >= bahaya)  return 2;
-  if (v >= waspada) return 1;
-  return 0;
-}
+// ==================================================
+// SENSOR
+// ==================================================
 
-void outPin(uint8_t pin, bool on, bool activeLow) {
-  digitalWrite(pin, (on ^ activeLow) ? HIGH : LOW);
-}
+#define DHT_PIN 23
+#define DHT_TYPE DHT11
+DHT dht(DHT_PIN, DHT_TYPE);
 
-bool blinkEvery(unsigned long ms) { return (millis() / ms) % 2 == 0; }
+#define FLAME_PIN 14
+#define GAS_PIN 34
 
-// ===================== MQ-2 =====================
-float mq2Volt() {                       // tegangan di pin AO modul (sebelum pembagi)
-  uint32_t sum = 0;
-  for (int i = 0; i < 16; i++) { sum += analogReadMilliVolts(PIN_MQ2); delay(2); }
-  return (sum / 16.0f / 1000.0f) * DIVIDER_RATIO;
-}
+const bool FLAME_ACTIVE_HIGH = false;
 
-float mq2Rs(float vout) {
-  if (vout < 0.05f) vout = 0.05f;
-  if (vout > MQ2_VCC - 0.05f) vout = MQ2_VCC - 0.05f;
-  return (MQ2_VCC - vout) / vout * MQ2_RL_KOHM;
-}
+const int GAS_THRESHOLD = 2000;
+const float BATAS_SUHU = 30.0;
 
-// Dipanggil SEKALI setelah masa pemanasan selesai (tidak memblokir sensor lain)
-void mq2Calibrate() {
-  float rs = 0;
-  for (int i = 0; i < 50; i++) { rs += mq2Rs(mq2Volt()); delay(20); }
-  mq2R0 = (rs / 50.0f) / MQ2_CLEAN_AIR;
-  mq2Ready = true;
-  Serial.printf("[MQ2] Kalibrasi selesai, R0 = %.2f kOhm (pastikan saat itu udara bersih)\n", mq2R0);
-}
+// ==================================================
+// OUTPUT
+// ==================================================
 
-// ===================== BACA SENSOR =====================
-void readSensors() {
-  // --- MQ-2: estimasi kasar, kalibrasi ulang sesuai sensor Anda ---
-  int asap = 0, gas = 0;
-  if (mq2Ready) {
-    float ratio = mq2Rs(mq2Volt()) / mq2R0;
-    if (ratio < 0.05f) ratio = 0.05f;
-    float smoke = 3616.1f * powf(ratio, -2.675f);          // ppm asap (perkiraan)
-    float lpg   = 574.25f * powf(ratio, -2.222f);          // ppm LPG  (perkiraan)
-    asap = (int) constrain(smoke, 0.0f, 99999.0f);
-    gas  = (int) constrain(lpg / 10000.0f * 100.0f, 0.0f, 100.0f);   // persen skala 0-10.000 ppm
+#define LED_HIJAU 4
+#define LED_MERAH 18
+#define BUZZER_PIN 27
+#define KIPAS_PIN 26
+
+const bool KIPAS_ACTIVE_LOW = true;
+
+// ==================================================
+// STATUS SENSOR
+// ==================================================
+
+bool apiTerdeteksi = false;
+bool gasTerdeteksi = false;
+bool suhuTinggi = false;
+bool suhuValid = false;
+
+bool kelembapanValid = false;
+bool kondisiGabungan = false;
+bool kipasMenyala = false;
+
+float suhu = NAN;
+float kelembapan = NAN;
+
+int nilaiGas = 0;
+
+// ==================================================
+// TIMER
+// ==================================================
+
+unsigned long waktuAlarm = 0;
+unsigned long waktuKirim = 0;
+unsigned long waktuWiFi = 0;
+
+bool statusBunyi = false;
+
+// ==================================================
+// KONEKSI WIFI
+// ==================================================
+
+void hubungkanWiFi() {
+  if (WiFi.status() == WL_CONNECTED) {
+    return;
   }
 
-  // --- Sensor api: pilih nilai mayoritas dari 5 pembacaan ---
-  int hit = 0;
-  for (int i = 0; i < 5; i++) { if (digitalRead(PIN_FLAME) == (FLAME_ACTIVE_LOW ? LOW : HIGH)) hit++; delay(2); }
-  bool apiNow = hit >= 3;
+  Serial.println();
+  Serial.println("Menghubungkan ke WiFi...");
 
-  // --- DHT11: maksimal tiap 2 detik ---
-  float t = suhu, h = kelembaban;
-  if (millis() - lastDht >= 2000) {
-    lastDht = millis();
-    float nt = dht.readTemperature(), nh = dht.readHumidity();
-    if (!isnan(nt) && !isnan(nh)) { t = nt; h = nh; dhtFail = 0; }
-    else if (++dhtFail >= 5) { t = NAN; h = NAN; }
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+
+  unsigned long mulai = millis();
+
+  while (WiFi.status() != WL_CONNECTED &&
+         millis() - mulai < 15000) {
+    delay(500);
+    Serial.print(".");
   }
 
-  // --- simpan + nilai level ---
-  xSemaphoreTake(dataMutex, portMAX_DELAY);
-  suhu = t; kelembaban = h; asapPpm = asap; gasPct = gas; api = apiNow;
-  xSemaphoreGive(dataMutex);
-
-  lvlSuhu = levelOf(t, TH_SUHU_WASPADA, TH_SUHU_BAHAYA);
-  lvlAsap = levelOf(asap, TH_ASAP_WASPADA, TH_ASAP_BAHAYA);
-  lvlGas  = levelOf(gas, TH_GAS_WASPADA, TH_GAS_BAHAYA);
-  lvlApi  = apiNow ? 2 : 0;
-  lvlAll  = max(max(lvlSuhu, lvlAsap), max(lvlGas, lvlApi));
-
-  Serial.printf("[SENSOR] suhu=%.1fC hum=%.0f%% asap=%dppm gas=%d%% api=%d level=%d\n",
-                isnan(t) ? -1.0f : t, isnan(h) ? -1.0f : h, asap, gas, apiNow, lvlAll);
-}
-
-// ===================== AKTUATOR =====================
-void applyActuators() {
-  bool led, buzzer;
-  if (lvlAll == 2) {            // BAHAYA: LED kedip cepat + buzzer putus-putus
-    led = blinkEvery(250);
-    buzzer = blinkEvery(300);
-  } else if (lvlAll == 1) {     // WASPADA: LED kedip pelan, buzzer ikut pengaturan dashboard
-    led = blinkEvery(800);
-    buzzer = webBuzzer;
-  } else {                      // AMAN: ikut pengaturan dashboard
-    led = webLed;
-    buzzer = webBuzzer;
-  }
-  // Kipas menyala otomatis untuk membuang asap/gas/panas, KECUALI ada api
-  // (kipas bisa membesarkan api). Selain itu ikut pengaturan dashboard.
-  bool kipasAuto = (!api) && (lvlAsap >= 1 || lvlGas >= 1 || lvlSuhu >= 1);
-  bool kipas = webKipas || kipasAuto;
-
-  outPin(PIN_LED, led, false);
-  outPin(PIN_BUZZER, buzzer, BUZZER_ACTIVE_LOW);
-  outPin(PIN_RELAY, kipas, RELAY_ACTIVE_LOW);
-}
-
-// ===================== KIRIM DATA (task core 0) =====================
-int jsonFlag(const String& s, const char* key) {
-  String k = String("\"") + key + "\":";
-  int i = s.indexOf(k);
-  if (i < 0) return -1;
-  return s.charAt(i + k.length()) == '1' ? 1 : 0;
-}
-
-void sendData() {
-  if (WiFi.status() != WL_CONNECTED) return;
-
-  float t, h; int a, g; bool f;
-  xSemaphoreTake(dataMutex, portMAX_DELAY);
-  t = suhu; h = kelembaban; a = asapPpm; g = gasPct; f = api;
-  xSemaphoreGive(dataMutex);
-
-  String body = "{\"device_id\":\"" + String(DEVICE_ID) + "\"";
-  body += ",\"suhu\":" + (isnan(t) ? String("null") : String(t, 1));
-  body += ",\"kelembaban\":" + (isnan(h) ? String("null") : String(h, 1));
-  body += ",\"asap\":" + String(a);
-  body += ",\"gas\":" + String(g);
-  body += ",\"api\":" + String(f ? 1 : 0) + "}";
-
-  HTTPClient http;
-  WiFiClient plain;
-  WiFiClientSecure secure;
-  if (String(SERVER_URL).startsWith("https")) {
-    secure.setInsecure();               // TIDAK memverifikasi sertifikat. Produksi: pakai setCACert()
-    http.begin(secure, SERVER_URL);
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println();
+    Serial.println("WiFi berhasil terhubung!");
+    Serial.print("IP ESP32: ");
+    Serial.println(WiFi.localIP());
   } else {
-    http.begin(plain, SERVER_URL);
+    Serial.println();
+    Serial.println("WiFi belum terhubung.");
   }
+}
+
+// ==================================================
+// FUNGSI KIPAS
+// ==================================================
+
+void setKipas(bool nyala) {
+  if (KIPAS_ACTIVE_LOW) {
+    digitalWrite(KIPAS_PIN, nyala ? LOW : HIGH);
+  } else {
+    digitalWrite(KIPAS_PIN, nyala ? HIGH : LOW);
+  }
+}
+
+// ==================================================
+// FUNGSI ALARM
+// ==================================================
+
+void aturAlarm() {
+  unsigned long sekarang = millis();
+
+  if (kondisiGabungan) {
+    digitalWrite(LED_MERAH, HIGH);
+    digitalWrite(LED_HIJAU, LOW);
+    tone(BUZZER_PIN, 2500);
+    return;
+  }
+
+  if (apiTerdeteksi) {
+    if (sekarang - waktuAlarm >= 100) {
+      waktuAlarm = sekarang;
+      statusBunyi = !statusBunyi;
+
+      if (statusBunyi) {
+        tone(BUZZER_PIN, 2000);
+      } else {
+        noTone(BUZZER_PIN);
+      }
+    }
+
+    digitalWrite(LED_MERAH, HIGH);
+    digitalWrite(LED_HIJAU, LOW);
+    return;
+  }
+
+  noTone(BUZZER_PIN);
+  statusBunyi = false;
+
+  if (gasTerdeteksi || suhuTinggi || !suhuValid) {
+    digitalWrite(LED_MERAH, HIGH);
+    digitalWrite(LED_HIJAU, LOW);
+  } else {
+    digitalWrite(LED_MERAH, LOW);
+    digitalWrite(LED_HIJAU, HIGH);
+  }
+}
+
+// ==================================================
+// BACA SENSOR
+// ==================================================
+
+void bacaSensor() {
+  suhu = dht.readTemperature();
+  kelembapan = dht.readHumidity();
+
+  suhuValid = !isnan(suhu);
+  kelembapanValid = !isnan(kelembapan);
+
+  int nilaiApi = digitalRead(FLAME_PIN);
+
+  apiTerdeteksi = FLAME_ACTIVE_HIGH
+    ? (nilaiApi == HIGH)
+    : (nilaiApi == LOW);
+
+  nilaiGas = analogRead(GAS_PIN);
+  gasTerdeteksi = (nilaiGas >= GAS_THRESHOLD);
+
+  suhuTinggi = suhuValid && (suhu > BATAS_SUHU);
+
+  kondisiGabungan =
+    apiTerdeteksi &&
+    gasTerdeteksi &&
+    suhuTinggi;
+
+  // Logika kipas dipertahankan seperti program awal.
+  if (kondisiGabungan || apiTerdeteksi) {
+    kipasMenyala = false;
+  } else {
+    kipasMenyala = gasTerdeteksi || suhuTinggi;
+  }
+
+  setKipas(kipasMenyala);
+  aturAlarm();
+}
+
+// ==================================================
+// STATUS SISTEM
+// ==================================================
+
+const char* statusSistem() {
+  if (!suhuValid || !kelembapanValid) {
+    return "waspada";
+  }
+
+  if (kondisiGabungan) {
+    return "bahaya";
+  }
+
+  if (apiTerdeteksi) {
+    return "bahaya";
+  }
+
+  if (gasTerdeteksi || suhuTinggi) {
+    return "waspada";
+  }
+
+  return "aman";
+}
+
+// ==================================================
+// TAMPILKAN OLED
+// ==================================================
+
+void tampilkanOLED() {
+  display.clearDisplay();
+  display.setTextColor(SSD1306_WHITE);
+  display.setTextSize(1);
+
+  display.setCursor(0, 0);
+  display.println("MONITOR KEAMANAN");
+  display.println("----------------");
+
+  display.setCursor(0, 16);
+  display.print("Suhu: ");
+
+  if (suhuValid) {
+    display.print(suhu, 1);
+    display.println(" C");
+  } else {
+    display.println("ERROR");
+  }
+
+  display.setCursor(0, 26);
+  display.print("Api: ");
+  display.println(apiTerdeteksi ? "TERDETEKSI" : "Tidak");
+
+  display.setCursor(0, 36);
+  display.print("Gas/Asap ADC: ");
+  display.println(nilaiGas);
+
+  display.setCursor(0, 46);
+  display.print("Kipas: ");
+  display.println(kipasMenyala ? "NYALA" : "MATI");
+
+  display.setCursor(0, 56);
+  display.print("WiFi: ");
+  display.print(
+    WiFi.status() == WL_CONNECTED ? "ONLINE" : "OFFLINE"
+  );
+
+  display.display();
+}
+
+// ==================================================
+// SERIAL MONITOR
+// ==================================================
+
+void tampilkanSerial() {
+  Serial.print("Suhu: ");
+
+  if (suhuValid) Serial.print(suhu, 1);
+  else Serial.print("ERROR");
+
+  Serial.print(" C | Kelembapan: ");
+
+  if (kelembapanValid) Serial.print(kelembapan, 1);
+  else Serial.print("ERROR");
+
+  Serial.print(" % | Api: ");
+  Serial.print(apiTerdeteksi ? "YA" : "TIDAK");
+
+  Serial.print(" | MQ2 ADC: ");
+  Serial.print(nilaiGas);
+
+  Serial.print(" | Status: ");
+  Serial.print(statusSistem());
+
+  Serial.print(" | Kipas: ");
+  Serial.println(kipasMenyala ? "NYALA" : "MATI");
+}
+
+// ==================================================
+// KIRIM DATA KE PHP API
+// ==================================================
+
+void kirimDataServer() {
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("Data belum dikirim: WiFi terputus.");
+    return;
+  }
+
+  if (!suhuValid || !kelembapanValid) {
+    Serial.println("Data belum dikirim: pembacaan DHT tidak valid.");
+    return;
+  }
+
+  WiFiClient client;
+  HTTPClient http;
+
+  if (!http.begin(client, SERVER_URL)) {
+    Serial.println("Gagal memulai koneksi HTTP.");
+    return;
+  }
+
   http.setTimeout(5000);
+
   http.addHeader("Content-Type", "application/json");
   http.addHeader("X-API-KEY", API_KEY);
 
-  int code = http.POST(body);
-  if (code == 200) {
-    String res = http.getString();
-    int b = jsonFlag(res, "buzzer"), l = jsonFlag(res, "led"), k = jsonFlag(res, "kipas");
-    if (b >= 0) webBuzzer = b;
-    if (l >= 0) webLed = l;
-    if (k >= 0) webKipas = k;
-    Serial.printf("[HTTP] OK  buzzer=%d led=%d kipas=%d\n", webBuzzer, webLed, webKipas);
+  // Konversi nilai ADC (0-4095) menjadi persentase Gas (0-100%)
+  float persenGas = (nilaiGas / 4095.0) * 100.0;
+
+  String json = "{";
+  json += "\"api_key\":\"" + String(API_KEY) + "\",";
+  json += "\"id_alat\":" + String(ID_ALAT) + ",";
+  json += "\"suhu\":" + String(suhu, 1) + ",";
+  json += "\"kelembaban\":" + String(kelembapan, 1) + ",";
+  json += "\"mq2_adc\":" + String(nilaiGas) + ",";
+  
+  // MENGUBAH null MENJADI NILAI SENSOR:
+  json += "\"kadar_asap\":" + String(nilaiGas) + ",";      // Pakai nilai ADC mentah sebagai estimasi Asap
+  json += "\"kadar_gas\":" + String(persenGas, 1) + ","; // Pakai nilai persentase untuk Gas
+  
+  json += "\"status_api\":" + String(apiTerdeteksi ? 1 : 0) + ",";
+  json += "\"status_sistem\":\"" + String(statusSistem()) + "\"";
+  json += "}";
+
+  Serial.println();
+  Serial.println("Mengirim data ke server...");
+  Serial.println(json);
+
+  int httpCode = http.POST(json);
+
+  if (httpCode > 0) {
+    Serial.print("HTTP Code: ");
+    Serial.println(httpCode);
+
+    String response = http.getString();
+
+    Serial.print("Respons server: ");
+    Serial.println(response);
+
+    if (httpCode >= 200 && httpCode < 300) {
+      Serial.println("Pengiriman berhasil.");
+    } else {
+      Serial.println("Server menolak atau gagal memproses data.");
+    }
   } else {
-    Serial.printf("[HTTP] Gagal, kode=%d (%s)\n", code, code < 0 ? HTTPClient::errorToString(code).c_str() : "");
+    Serial.print("HTTP gagal: ");
+    Serial.println(http.errorToString(httpCode));
   }
+
   http.end();
 }
+// ==================================================
+// SETUP
+// ==================================================
 
-void netTask(void*) {
-  for (;;) {
-    sendData();
-    vTaskDelay(SEND_INTERVAL_MS / portTICK_PERIOD_MS);
-  }
-}
-
-// ===================== WIFI =====================
-void wifiConnect() {
-  WiFi.mode(WIFI_STA);
-  WiFi.setAutoReconnect(true);
-  WiFi.begin(WIFI_SSID, WIFI_PASS);
-  Serial.print(F("[WiFi] Menghubungkan"));
-  unsigned long t0 = millis();
-  while (WiFi.status() != WL_CONNECTED && millis() - t0 < 15000) { delay(300); Serial.print('.'); }
-  if (WiFi.status() == WL_CONNECTED) Serial.printf("\n[WiFi] OK, IP %s\n", WiFi.localIP().toString().c_str());
-  else Serial.println(F("\n[WiFi] Belum terhubung, sistem tetap berjalan lokal."));
-}
-
-void wifiKeepAlive() {
-  if (WiFi.status() == WL_CONNECTED || millis() - lastWifiTry < 10000) return;
-  lastWifiTry = millis();
-  WiFi.disconnect();
-  WiFi.begin(WIFI_SSID, WIFI_PASS);
-}
-
-// ===================== SETUP / LOOP =====================
 void setup() {
   Serial.begin(115200);
-  delay(300);
 
-  pinMode(PIN_LED, OUTPUT);
-  pinMode(PIN_BUZZER, OUTPUT);
-  pinMode(PIN_RELAY, OUTPUT);
-  pinMode(PIN_FLAME, INPUT);
-  outPin(PIN_LED, false, false);
-  outPin(PIN_BUZZER, false, BUZZER_ACTIVE_LOW);
-  outPin(PIN_RELAY, false, RELAY_ACTIVE_LOW);
+  pinMode(FLAME_PIN, INPUT);
+  pinMode(LED_HIJAU, OUTPUT);
+  pinMode(LED_MERAH, OUTPUT);
+  pinMode(BUZZER_PIN, OUTPUT);
+  pinMode(KIPAS_PIN, OUTPUT);
 
   analogReadResolution(12);
-  analogSetPinAttenuation(PIN_MQ2, ADC_11db);
+
+  digitalWrite(LED_HIJAU, LOW);
+  digitalWrite(LED_MERAH, LOW);
+
+  noTone(BUZZER_PIN);
+  setKipas(false);
+
   dht.begin();
-  dataMutex = xSemaphoreCreateMutex();
 
-  // Uji aktuator singkat (relay & buzzer akan berbunyi sebentar)
-  outPin(PIN_LED, true, false); outPin(PIN_BUZZER, true, BUZZER_ACTIVE_LOW); delay(150);
-  outPin(PIN_LED, false, false); outPin(PIN_BUZZER, false, BUZZER_ACTIVE_LOW);
+  Wire.begin(21, 22);
 
-  wifiConnect();
-  xTaskCreatePinnedToCore(netTask, "netTask", 12288, NULL, 1, NULL, 0);
+  if (!display.begin(
+        SSD1306_SWITCHCAPVCC, OLED_ADDRESS)) {
+    Serial.println("OLED tidak terdeteksi!");
 
-  Serial.println(F("[MQ2] Pemanasan 30 dtk, pastikan udara bersih. Sensor api & suhu tetap aktif."));
+    while (true) {
+      delay(1000);
+    }
+  }
+
+  display.clearDisplay();
+  display.setTextColor(SSD1306_WHITE);
+  display.setTextSize(1);
+  display.setCursor(0, 0);
+
+  display.println("MONITOR KEAMANAN");
+  display.println("Memulai sensor...");
+  display.display();
+
+  delay(2000);
+
+  // Hubungkan WiFi setelah OLED dan sensor siap.
+  hubungkanWiFi();
+
+  Serial.println();
+  Serial.println("Sistem CEKAPI.id siap.");
 }
 
+// ==================================================
+// LOOP
+// ==================================================
+
 void loop() {
-  unsigned long now = millis();
-  wifiKeepAlive();
+  unsigned long sekarang = millis();
 
-  // Kalibrasi MQ-2 otomatis setelah pemanasan (sensor lain sudah berjalan sejak awal)
-  if (!mq2Ready && now >= MQ2_WARMUP_MS) mq2Calibrate();
+  // 1. Baca sensor.
+  bacaSensor();
 
-  if (now - lastSense >= 1000) {
-    lastSense = now;
-    readSensors();
+  // 2. Tampilkan OLED.
+  tampilkanOLED();
+
+  // 3. Tampilkan Serial Monitor.
+  tampilkanSerial();
+
+  // 4. Coba sambungkan ulang WiFi secara berkala.
+  if (WiFi.status() != WL_CONNECTED &&
+      sekarang - waktuWiFi >= INTERVAL_WIFI) {
+    waktuWiFi = sekarang;
+    hubungkanWiFi();
   }
-  applyActuators();   // dipanggil tiap putaran agar kedip LED/buzzer mulus
-  delay(10);
+
+  // 5. Kirim data setiap 2 detik.
+  if (sekarang - waktuKirim >= INTERVAL_KIRIM) {
+    waktuKirim = sekarang;
+    kirimDataServer();
+  }
+
+  delay(1000);
 }

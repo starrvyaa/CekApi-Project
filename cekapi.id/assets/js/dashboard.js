@@ -3,7 +3,6 @@
   "use strict";
   const base = window.CEKAPI.base;
   const $ = (s, r = document) => r.querySelector(s);
-  const LABEL = { aman: "NORMAL", waspada: "WASPADA", bahaya: "BAHAYA" };
   const BADGE = { aman: "Aman", waspada: "Waspada", bahaya: "Bahaya" };
   const baseTitle = document.title;
   let chart = null,
@@ -27,18 +26,157 @@
     return res.json();
   }
 
-  function paint(id, state, value, text) {
-    const el = $("#card-" + id);
-    if (!el) return;
-    el.dataset.state = state;
-    if (value !== null && value !== undefined) {
-      const v = $("[data-val]", el);
-      if (v) v.textContent = value;
+  /* ---------- Logika visual kustom untuk kartu ---------- */
+  function updateVisualCards(x, on) {
+    // 1. KARTU SUHU (Dingin < 22°C | Hangat 22 - 30°C | Panas > 30°C)
+    const cardSuhu = $("#card-suhu");
+    if (cardSuhu) {
+      const valEl = $("[data-val]", cardSuhu);
+      const textEl = $("[data-state-text]", cardSuhu);
+      const bar = $("[data-bar]", cardSuhu);
+
+      if (!on || x.suhu === null) {
+        if (valEl) valEl.textContent = "--";
+        if (textEl) textEl.textContent = "OFFLINE";
+        cardSuhu.dataset.state = "aman";
+      } else {
+        const val = parseFloat(x.suhu);
+        if (valEl) valEl.textContent = val.toFixed(1).replace(".", ",");
+
+        let statusText = "Hangat";
+        let stateClass = "aman";
+
+        if (val < 22.0) {
+          statusText = "Dingin";
+          stateClass = "aman";
+        } else if (val >= 22.0 && val <= 30.0) {
+          statusText = "Hangat";
+          stateClass = "waspada";
+        } else {
+          statusText = "Panas";
+          stateClass = "bahaya";
+        }
+
+        if (textEl) textEl.textContent = "Status: " + statusText;
+        cardSuhu.dataset.state = stateClass;
+
+        if (bar) {
+          const heightPercent = Math.max(0, Math.min(100, (val / 60) * 100));
+          bar.style.height = heightPercent + "%";
+        }
+      }
     }
-    $("[data-state-text]", el).textContent = text || LABEL[state];
+
+    // 2. KARTU API (Terdeteksi -> Merah | Tidak Terdeteksi -> Abu-abu)
+    const cardApi = $("#card-api");
+    if (cardApi) {
+      const textEl = $("[data-state-text]", cardApi);
+      const iconPic = $(".pic", cardApi);
+
+      if (!on) {
+        if (textEl) textEl.textContent = "OFFLINE";
+        cardApi.dataset.state = "aman";
+        if (iconPic) iconPic.style.color = "#888888";
+      } else {
+        const isApi = Boolean(x.api);
+        if (textEl) textEl.textContent = isApi ? "TERDETEKSI" : "TIDAK TERDETEKSI";
+        
+        if (isApi) {
+          cardApi.dataset.state = "bahaya";
+          if (iconPic) iconPic.style.color = "#ff3b30"; // Merah
+        } else {
+          cardApi.dataset.state = "aman";
+          if (iconPic) iconPic.style.color = "#888888"; // Abu-abu
+        }
+      }
+    }
+
+    // 3. KARTU ASAP (Tidak Pekat < 100 | Sedang 100 - 300 | Pekat > 300)
+    const cardAsap = $("#card-asap");
+    if (cardAsap) {
+      const valEl = $("[data-val]", cardAsap);
+      const textEl = $("[data-state-text]", cardAsap);
+      const iconPic = $(".pic", cardAsap);
+
+      if (!on || x.asap === null) {
+        if (valEl) valEl.textContent = "--";
+        if (textEl) textEl.textContent = "OFFLINE";
+        cardAsap.dataset.state = "aman";
+      } else {
+        const val = parseInt(x.asap, 10);
+        if (valEl) valEl.textContent = val;
+
+        let statusText = "Tidak Pekat";
+        let stateClass = "aman";
+        let opacity = 0.3; // Semakin pekat semakin jelas/gelap
+
+        if (val < 100) {
+          statusText = "Tidak Pekat";
+          stateClass = "aman";
+          opacity = 0.3;
+        } else if (val >= 100 && val <= 300) {
+          statusText = "Sedang";
+          stateClass = "waspada";
+          opacity = 0.65;
+        } else {
+          statusText = "Pekat";
+          stateClass = "bahaya";
+          opacity = 1.0;
+        }
+
+        if (textEl) textEl.textContent = "Status: " + statusText;
+        cardAsap.dataset.state = stateClass;
+        if (iconPic) {
+          iconPic.style.opacity = opacity;
+          iconPic.style.transition = "opacity 0.4s ease";
+        }
+      }
+    }
+
+    // 4. KARTU GAS (Rendah < 20% | Normal 20 - 50% | Tinggi > 50%)
+    const cardGas = $("#card-gas");
+    if (cardGas) {
+      const valEl = $("[data-val]", cardGas);
+      const textEl = $("[data-state-text]", cardGas);
+      const iconPic = $(".pic", cardGas);
+
+      if (!on || x.gas === null) {
+        if (valEl) valEl.textContent = "--";
+        if (textEl) textEl.textContent = "OFFLINE";
+        cardGas.dataset.state = "aman";
+      } else {
+        const val = parseFloat(x.gas);
+        if (valEl) valEl.textContent = val.toFixed(1).replace(".", ",");
+
+        let statusText = "Normal";
+        let stateClass = "aman";
+
+        if (val < 20.0) {
+          statusText = "Rendah";
+          stateClass = "aman";
+        } else if (val >= 20.0 && val <= 50.0) {
+          statusText = "Normal";
+          stateClass = "aman";
+        } else {
+          statusText = "Tinggi";
+          stateClass = "bahaya";
+        }
+
+        if (textEl) textEl.textContent = "Status: " + statusText;
+        cardGas.dataset.state = stateClass;
+
+        // Memutar ikon Gauge SVG sesuai persentase nilai gas (0 - 100% -> -90 deg s/d 90 deg)
+        if (iconPic) {
+          const deg = -90 + Math.min(100, Math.max(0, val)) * 1.8;
+          iconPic.style.transform = `rotate(${deg}deg)`;
+          iconPic.style.transition = "transform 0.4s ease";
+          iconPic.style.display = "inline-block";
+        }
+      }
+    }
   }
 
-  /* ---------- Kartu Indikator ---------- */
+  /* ---------- Kartu Indikator Polling ---------- */
   async function pollLatest() {
     const conn = $("#conn"),
       cards = $("#cards");
@@ -53,43 +191,15 @@
       const on = d.online,
         s = d.status,
         x = d.data;
+
       conn.className = "conn " + (on ? "online" : "offline");
       conn.textContent =
         (on ? "Perangkat online · " : "Perangkat offline · data terakhir ") +
         d.updated_at;
       cards.classList.toggle("stale", !on);
 
-      const st = (k) => (on ? s[k] : "aman");
-      const tx = (k, t) => (on ? t : "OFFLINE");
-      paint(
-        "suhu",
-        st("suhu"),
-        x.suhu === null ? "--" : x.suhu.toFixed(1).replace(".", ","),
-        tx("suhu", LABEL[s.suhu]),
-      );
-      paint(
-        "asap",
-        st("asap"),
-        x.asap === null ? "--" : x.asap,
-        tx("asap", LABEL[s.asap]),
-      );
-      paint(
-        "gas",
-        st("gas"),
-        x.gas === null ? "--" : x.gas,
-        tx("gas", LABEL[s.gas]),
-      );
-      paint(
-        "api",
-        st("api"),
-        null,
-        tx("api", x.api ? "TERDETEKSI" : "TIDAK TERDETEKSI"),
-      );
-
-      const bar = $("[data-bar]", $("#card-suhu"));
-      if (bar && x.suhu !== null)
-        bar.style.height =
-          Math.max(0, Math.min(100, (x.suhu / 60) * 100)) + "%";
+      // Panggil pembaruan visual kartu
+      updateVisualCards(x, on);
 
       document.title =
         (on && s.overall === "bahaya" ? "⚠ BAHAYA · " : "") + baseTitle;
@@ -212,17 +322,15 @@
           },
           x: { ticks: { maxTicksLimit: 8 } },
         },
-        plugins: { legend: { display: false } }, // Legenda disembunyikan
+        plugins: { legend: { display: false } },
       },
     });
     return true;
   }
 
-  // Fungsi Filter Grafik + Penyesuaian Sumbu Y
   function applySensorFilter(val) {
     if (!chart) return;
 
-    // Dataset: 0 = Suhu (°C), 1 = Asap (ppm), 2 = Gas (%)
     if (val === "suhu") {
       chart.data.datasets[0].hidden = false;
       chart.data.datasets[1].hidden = true;
@@ -248,7 +356,6 @@
       chart.options.scales.y.title.text = "%";
       chart.options.scales.y1.display = false;
     } else {
-      // 'all' / Semua Sensor
       chart.data.datasets[0].hidden = false;
       chart.data.datasets[1].hidden = false;
       chart.data.datasets[2].hidden = false;
@@ -276,7 +383,6 @@
     }
   }
 
-  // Event listener dropdown filter sensor
   const sensorFilter = $("#sensor-filter");
   if (sensorFilter) {
     sensorFilter.addEventListener("change", (e) => {

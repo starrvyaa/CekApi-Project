@@ -282,3 +282,31 @@ main.panel h2.sub {
   margin-top: 16px;
   margin-bottom: 12px;
 }
+
+/* =========================================
+   DESAIN BADGE (TINGKAT BAHAYA)
+========================================= */
+.badge {
+  padding: 6px 12px;
+  border-radius: 6px;
+  color: #ffffff; /* Warna teks putih */
+  font-weight: 700;
+  font-size: 0.85rem;
+  display: inline-block;
+  text-align: center;
+  min-width: 85px;
+  letter-spacing: 0.02em;
+}
+
+/* Varian Warna Badge */
+.badge.aman {
+  background-color: #2ecc71; /* Hijau */
+}
+
+.badge.waspada {
+  background-color: #f39c12; /* Oranye */
+}
+
+.badge.bahaya {
+  background-color: #e74c3c; /* Merah */
+}

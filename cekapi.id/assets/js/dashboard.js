@@ -240,7 +240,7 @@
       <tr>
         <td>${it.alat || "-"}</td>
         <td>${it.waktu || "-"}</td>
-        <td><span class="badge ${it.status || ""}">${BADGE[it.status] || it.status || "-"}</span></td>
+       <td><span class="badge ${it.status || ""}">${BADGE[it.status] || it.status || "-"}</span></td>
         <td>${it.pesan || "-"}</td>
       </tr>
     `,

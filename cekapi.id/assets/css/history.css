@@ -63,3 +63,23 @@ dialog.modal::backdrop{background:rgba(30,0,0,.6)}
 .panel h1.page-title {
   font-size: 1.4rem;
 }
+/* Ringkasan deteksi memakai tampilan tabel lama. */
+.sensor-summary-table th,
+.sensor-summary-table td {
+  text-align: center;
+}
+
+.toolbar .btn-blue {
+  margin-left: auto;
+}
+
+
+.sensor-log-table {
+  min-width: 900px;
+}
+
+.sensor-log-table th,
+.sensor-log-table td {
+  text-align: center;
+  white-space: nowrap;
+}

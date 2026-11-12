@@ -11,23 +11,27 @@
 // KONFIGURASI WIFI DAN SERVER CEKAPI.ID
 // ==================================================
 
-const char* WIFI_SSID     = "HMJTI";
-const char* WIFI_PASSWORD = "HM-JTi99";
+const char* WIFI_SSID     = "Kio";
+const char* WIFI_PASSWORD = "1sampai10";
 
 // Ganti IP berikut dengan IPv4 komputer yang menjalankan Laragon.
 const char* SERVER_URL =
-  "http://10.10.3.104/CekApi-Project/cekapi.id/api/sensor/store.php";
+  "http://192.168.0.6/CekApi-Project/cekapi.id/api/sensor/store.php";
+
+const char* CONTROL_URL =
+  "http://192.168.0.6/CekApi-Project/cekapi.id/api/control.php";
 
 // Samakan dengan API_KEY di config/app.php.
 const char* API_KEY = "CEKAPI_ESP32_2026_Rahasia_9xK7pQ2m";
 
 // Ganti dengan id_alat yang benar-benar terdaftar di tabel alat.
-const int ID_ALAT = 1;
+const int ID_ALAT = 2;
 
 // Kirim data setiap 2 detik.
 // Kirim data setiap 10 detik (10000 ms) atau 1 menit (60000 ms).
 const unsigned long INTERVAL_KIRIM = 60000;
 const unsigned long INTERVAL_WIFI = 10000;
+const unsigned long INTERVAL_KONTROL = 3000;
 
 // ==================================================
 // OLED
@@ -55,7 +59,7 @@ DHT dht(DHT_PIN, DHT_TYPE);
 
 const bool FLAME_ACTIVE_HIGH = false;
 
-const int GAS_THRESHOLD = 2000;
+const int GAS_THRESHOLD = 600;
 const float BATAS_SUHU = 30.0;
 
 // ==================================================
@@ -88,12 +92,21 @@ float kelembapan = NAN;
 int nilaiGas = 0;
 
 // ==================================================
+// KONTROL MANUAL DARI WEBSITE
+// ==================================================
+
+bool manualLED = false;
+bool manualBuzzer = false;
+bool manualKipas = false;
+
+// ==================================================
 // TIMER
 // ==================================================
 
 unsigned long waktuAlarm = 0;
 unsigned long waktuKirim = 0;
 unsigned long waktuWiFi = 0;
+unsigned long waktuAmbilKontrol = 0;
 
 bool statusBunyi = false;
 
@@ -144,6 +157,88 @@ void setKipas(bool nyala) {
 }
 
 // ==================================================
+// MEMBACA KONTROL DARI WEBSITE
+// ==================================================
+
+bool bacaNilaiKontrol(String json, const char* nama, bool &hasil) {
+  String key = "\"" + String(nama) + "\"";
+
+  int posisi = json.indexOf(key);
+
+  if (posisi < 0) return false;
+
+  int titikDua = json.indexOf(':', posisi + key.length());
+
+  if (titikDua < 0) return false;
+
+  int awal = titikDua + 1;
+
+  while (awal < json.length() &&
+         (json[awal] == ' ' || json[awal] == '\n')) {
+    awal++;
+  }
+
+  if (json.startsWith("true", awal) ||
+      json.startsWith("1", awal)) {
+    hasil = true;
+    return true;
+  }
+
+  if (json.startsWith("false", awal) ||
+      json.startsWith("0", awal)) {
+    hasil = false;
+    return true;
+  }
+
+  return false;
+}
+
+void ambilKontrolServer() {
+  if (WiFi.status() != WL_CONNECTED) {
+    return;
+  }
+
+  WiFiClient client;
+  HTTPClient http;
+
+  if (!http.begin(client, CONTROL_URL)) {
+    Serial.println("Gagal memulai koneksi kontrol.");
+    return;
+  }
+
+  http.setTimeout(5000);
+  http.addHeader("X-API-KEY", API_KEY);
+
+  int httpCode = http.GET();
+
+  if (httpCode >= 200 && httpCode < 300) {
+    String response = http.getString();
+
+    bool led, buzzer, kipas;
+
+    bool valid =
+      bacaNilaiKontrol(response, "led", led) &&
+      bacaNilaiKontrol(response, "buzzer", buzzer) &&
+      bacaNilaiKontrol(response, "kipas", kipas);
+
+    if (valid) {
+      manualLED = led;
+      manualBuzzer = buzzer;
+      manualKipas = kipas;
+
+      Serial.println("Kontrol manual berhasil diperbarui.");
+    } else {
+      Serial.println("Format respons kontrol tidak valid.");
+    }
+  } else {
+    Serial.print("Gagal mengambil kontrol. HTTP: ");
+    Serial.println(httpCode);
+  }
+
+  http.end();
+}
+
+// ==================================================
 // FUNGSI ALARM
 // ==================================================
 
@@ -187,6 +282,44 @@ void aturAlarm() {
 }
 
 // ==================================================
+// KENDALI MANUAL DAN OTOMATIS
+// ==================================================
+
+void aturOutput() {
+  bool aman = strcmp(statusSistem(), "aman") == 0;
+
+  if (aman) {
+    digitalWrite(LED_MERAH, manualLED ? HIGH : LOW);
+    digitalWrite(LED_HIJAU, manualLED ? HIGH : LOW);
+
+    if (manualBuzzer) {
+      tone(BUZZER_PIN, 2000);
+    } else {
+      noTone(BUZZER_PIN);
+    }
+
+    statusBunyi = false;
+
+    kipasMenyala = manualKipas;
+    setKipas(kipasMenyala);
+
+    return;
+  }
+
+  // Logika otomatis tetap diprioritaskan.
+  aturAlarm();
+
+  // Logika kipas dipertahankan seperti program awal.
+  if (kondisiGabungan || apiTerdeteksi) {
+    kipasMenyala = false;
+  } else {
+    kipasMenyala = gasTerdeteksi || suhuTinggi;
+  }
+
+  setKipas(kipasMenyala);
+}
+
+// ==================================================
 // BACA SENSOR
 // ==================================================
 
@@ -213,15 +346,7 @@ void bacaSensor() {
     gasTerdeteksi &&
     suhuTinggi;
 
-  // Logika kipas dipertahankan seperti program awal.
-  if (kondisiGabungan || apiTerdeteksi) {
-    kipasMenyala = false;
-  } else {
-    kipasMenyala = gasTerdeteksi || suhuTinggi;
-  }
-
-  setKipas(kipasMenyala);
-  aturAlarm();
+  aturOutput();
 }
 
 // ==================================================
@@ -357,11 +482,11 @@ void kirimDataServer() {
   json += "\"suhu\":" + String(suhu, 1) + ",";
   json += "\"kelembaban\":" + String(kelembapan, 1) + ",";
   json += "\"mq2_adc\":" + String(nilaiGas) + ",";
-  
+
   // MENGUBAH null MENJADI NILAI SENSOR:
-  json += "\"kadar_asap\":" + String(nilaiGas) + ",";      // Pakai nilai ADC mentah sebagai estimasi Asap
-  json += "\"kadar_gas\":" + String(persenGas, 1) + ","; // Pakai nilai persentase untuk Gas
-  
+  json += "\"kadar_asap\":" + String(nilaiGas) + ",";
+  json += "\"kadar_gas\":" + String(persenGas, 1) + ",";
+
   json += "\"status_api\":" + String(apiTerdeteksi ? 1 : 0) + ",";
   json += "\"status_sistem\":\"" + String(statusSistem()) + "\"";
   json += "}";
@@ -393,6 +518,7 @@ void kirimDataServer() {
 
   http.end();
 }
+
 // ==================================================
 // SETUP
 // ==================================================
@@ -453,20 +579,26 @@ void loop() {
   unsigned long sekarang = millis();
 
   // 1. Baca sensor.
-  bacaSensor();
-
   // 2. Tampilkan OLED.
-  tampilkanOLED();
-
   // 3. Tampilkan Serial Monitor.
-  tampilkanSerial();
-
   // 4. Coba sambungkan ulang WiFi secara berkala.
+
   if (WiFi.status() != WL_CONNECTED &&
       sekarang - waktuWiFi >= INTERVAL_WIFI) {
     waktuWiFi = sekarang;
     hubungkanWiFi();
   }
+
+  // Ambil pengaturan kontrol dari website.
+  if (WiFi.status() == WL_CONNECTED &&
+      sekarang - waktuAmbilKontrol >= INTERVAL_KONTROL) {
+    waktuAmbilKontrol = sekarang;
+    ambilKontrolServer();
+  }
+
+  bacaSensor();
+  tampilkanOLED();
+  tampilkanSerial();
 
   // 5. Kirim data setiap 2 detik.
   if (sekarang - waktuKirim >= INTERVAL_KIRIM) {

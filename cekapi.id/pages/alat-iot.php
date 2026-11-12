@@ -5,10 +5,15 @@ require __DIR__ . '/../includes/csrf.php';
 require __DIR__ . '/../includes/icons.php';
 require_login();
 
-// $ctrl  = ambil_controls();
-// $acts  = ambil_aktivitas(8);
+$ctrl  = ambil_controls();
+$acts  = ambil_aktivitas(8);
 $warn  = hitung_peringatan_hari_ini();
-$devices = ['buzzer' => 'Buzzer', 'led' => 'LED', 'kipas' => 'Kipas'];
+
+$devices = [
+    'buzzer' => 'Buzzer',
+    'led'    => 'LED',
+    'kipas'  => 'Kipas'
+];
 
 $pageTitle = 'Alat IoT';
 $active    = 'alat';
@@ -27,17 +32,15 @@ include __DIR__ . '/partials/sidebar.php';
 
             <h1 id="ttl-panel">Panel Control Perangkat</h1>
 
-            <!-- Catatan tepat di bawah judul -->
             <p class="ctrl-note">
                 Saat kondisi bahaya, perangkat tetap menyalakan
                 alarm otomatis walaupun diatur OFF.
             </p>
 
             <div class="ctrl-panel">
-                
 
-                <?php foreach ($devices as $kode => $nama): 
-                    $on = !empty($ctrl[$kode]); 
+                <?php foreach ($devices as $kode => $nama):
+                    $on = !empty($ctrl[$kode]);
                 ?>
                     <div class="ctrl">
                         <p class="ctrl-label"
@@ -58,15 +61,14 @@ include __DIR__ . '/partials/sidebar.php';
                     </div>
                 <?php endforeach; ?>
 
-                <!-- Tombol simpan tetap di bawah -->
                 <div class="ctrl-foot">
                     <button type="button" class="btn-save" id="btnSave">
                         Simpan Perubahan
                     </button>
                 </div>
 
-             </div>
-          </section>
+            </div>
+        </section>
 
         <section aria-labelledby="ttl-akt">
             <h2 class="col-title" id="ttl-akt">Aktivitas</h2>
@@ -76,34 +78,32 @@ include __DIR__ . '/partials/sidebar.php';
             </h3>
 
             <div class="warn-card">
-              <div class="warn-summary">
-                  <?= icon('alert', 40) ?>
-                  <span class="num" id="warnCount"><?= (int) $warn ?></span>
-                  <span class="txt">Peringatan</span>
-              </div>
+                <div class="warn-summary">
+                    <?= icon('alert', 40) ?>
+                    <span class="num" id="warnCount"><?= (int) $warn ?></span>
+                    <span class="txt">Peringatan</span>
+                </div>
 
-              <p class="warn-description">
-                  Jumlah peringatan yang tercatat pada hari ini.
-              </p>
+                <p class="warn-description">
+                    Jumlah peringatan yang tercatat pada hari ini.
+                </p>
             </div>
 
             <h3 class="sub">Catatan Aktivitas</h3>
 
             <div class="act-log">
-                <!--
                 <ul id="actList">
-                <?php foreach ($acts as $a): ?>
-                    <li>
-                        <time><?= h($a['waktu']) ?></time>
-                        <?= h($a['pesan']) ?>
-                    </li>
-                <?php endforeach; ?>
+                    <?php foreach ($acts as $a): ?>
+                        <li>
+                            <time><?= h($a['waktu']) ?></time>
+                            <?= h($a['pesan']) ?>
+                        </li>
+                    <?php endforeach; ?>
                 </ul>
 
                 <p class="empty" id="actEmpty"<?= $acts ? ' hidden' : '' ?>>
                     Belum ada aktivitas.
                 </p>
-                -->
             </div>
         </section>
 
@@ -111,6 +111,3 @@ include __DIR__ . '/partials/sidebar.php';
 </main>
 
 <?php include __DIR__ . '/partials/footer.php'; ?>
-
-
-

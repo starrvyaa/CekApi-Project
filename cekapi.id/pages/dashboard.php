@@ -101,10 +101,10 @@ include __DIR__ . '/partials/sidebar.php';
               <option value="gas" style="background: #fff; color: #111;">Gas (%)</option>
             </select>
           </div>
-          <div class="seg" role="group" aria-label="Rentang grafik">
+          <!-- <div class="seg" role="group" aria-label="Rentang grafik">
             <button type="button" data-range="live" aria-pressed="true">Live</button>
             <button type="button" data-range="week" aria-pressed="false">7 Hari</button>
-          </div>
+          </div> -->
         </div>
         <div class="chart-box"><canvas id="chart" aria-label="Grafik suhu, asap, dan gas" role="img"></canvas></div>
       </section>

@@ -83,3 +83,78 @@ dialog.modal::backdrop{background:rgba(30,0,0,.6)}
   text-align: center;
   white-space: nowrap;
 }
+
+.pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 6px;
+    margin-top: 20px;
+    margin-bottom: 20px;
+  }
+  .btn-page {
+    padding: 6px 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    text-decoration: none;
+    color: #334155;
+    background-color: #fff;
+    font-size: 14px;
+    transition: background-color 0.2s;
+  }
+  .btn-page:hover {
+    background-color: #f1f5f9;
+  }
+  .btn-page.active {
+    background-color: #2563eb; /* Warna biru */
+    color: #fff;
+    border-color: #2563eb;
+  }
+  .page-dots {
+    color: #64748b;
+    padding: 0 4px;
+  }
+
+  /* Tampilan Status Sistem (Seperti tombol tapi tidak bisa diklik) */
+/* Tampilan dasar badge status */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 16px; /* Padding kiri-kanan dilebarkan sedikit agar bentuk bulatnya proporsional */
+  border-radius: 50px; /* Lengkungan sangat bulat */
+  font: 600 0.85rem var(--font-head, sans-serif);
+  letter-spacing: 0.5px;
+  cursor: default;
+  user-select: none;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+/* Warna untuk AMAN (Hijau) */
+.badge-aman {
+  background-color: #dcfce7;
+  color: #166534;
+  border-color: #bbf7d0;
+}
+
+/* Warna untuk WASPADA (Kuning) */
+.badge-waspada {
+  background-color: #fef9c3;
+  color: #854d0e;
+  border-color: #fde047;
+}
+
+/* Warna untuk BAHAYA (Merah) */
+.badge-bahaya {
+  background-color: #fee2e2;
+  color: #991b1b;
+  border-color: #fecaca;
+}
+
+/* Warna default jika status tidak dikenali (Abu-abu) */
+.badge-default {
+  background-color: #f1f5f9;
+  color: #334155;
+  border-color: #cbd5e1;
+}

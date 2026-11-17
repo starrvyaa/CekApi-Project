@@ -29,13 +29,24 @@ $alat = [
     ['online', $online ? 'bellring' : 'x', 'Status Perangkat: ' . ($online ? 'ONLINE' : 'OFFLINE'),
         $terakhir ? 'Data terakhir diterima ' . fmt_waktu($terakhir) . '.' : 'Belum ada data yang diterima dari perangkat.'],
 ];
+
+// Tambahkan path foto masing-masing anggota tim di elemen ke-4
 $tim = [
-    ['Safina Rahmatus Sa’diyah', 'E43252017', '@starrvyaa_'],
-    ['Rifda Aprilia', 'E43252017', '@starrvyaa_'],
-    ['Gery Riski Danindra', 'E43251922', '@starrvyaa_'],
-    ['Ahmad Hafiz Azmi', 'E43252322', '@hafisazmi_'],
-    ['Muhammad Nawawi', 'E43251617', '@Mhmdnawawi_'],
-    ['Galih Ahmad', 'E43251817', '@Galih_'],
+    ['Safina Rahmatus Sa’diyah', 'E43251922', '@starrvyaa_', 'assets/img/tim/safina1.jfif'],
+    ['Rifda Aprilia', 'E43252017', '@rfdaprl_', 'assets/img/tim/rifda.jpg'],
+    ['Gery Riski Danindra', 'E43252067', '@kirin.ws', 'assets/img/tim/gery.jpg'],
+    ['Ahmad Hafiz Azmi', 'E43252322', '@getyourcapten_', 'assets/img/tim/azmi.jpg'],
+    ['Muhammad Nawawi', 'E43251617', '@awi_wul', 'assets/img/tim/nawawi.jpg'],
+    ['Galih Ahmad', 'E43251817', '@nryqogalih', 'assets/img/tim/galih.jpg'],
+];
+
+// Tambahkan path foto galeri (g1 - g5)
+$galeri = [
+    ['g1', 'assets/img/galeri/gambar1.jpg', 'Dokumentasi CEKAPI 1'],
+    ['g2', 'assets/img/galeri/gambar2.jpeg', 'Dokumentasi CEKAPI 2'],
+    ['g3', 'assets/img/galeri/gambar3.jfif', 'Dokumentasi CEKAPI 3'],
+    ['g4', 'assets/img/galeri/gambar4.jpg', 'Dokumentasi CEKAPI 4'],
+    ['g5', 'assets/img/galeri/gambar5.jpg', 'Dokumentasi CEKAPI 5'],
 ];
 ?>
 <!DOCTYPE html>
@@ -47,18 +58,18 @@ $tim = [
   <meta name="description" content="Integrasi web dan IoT untuk deteksi dini kebocoran gas dan kebakaran dapur.">
   <link rel="icon" type="image/svg+xml" href="<?= h(base_url('assets/img/maskotLogo.png')) ?>">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,400;0,600;0,700;1,400&amp;family=Poppins:wght@400;500;600;700;800&amp;display=swap">
-  <link rel="stylesheet" href="<?= h(base_url('assets/css/global.css')) ?>">
-  <link rel="stylesheet" href="<?= h(base_url('assets/css/landing.css')) ?>">
+  <link rel="stylesheet" href="<?= h(base_url('assets/css/global.css')) ?>?v=<?= @filemtime(__DIR__ . '/assets/css/global.css') ?: time() ?>">
+  <link rel="stylesheet" href="<?= h(base_url('assets/css/landing.css')) ?>?v=<?= @filemtime(__DIR__ . '/assets/css/landing.css') ?: time() ?>">
 </head>
 <body class="landing">
 
 <header class="nav">
-  <a class="logo" href="#beranda"><img src="<?= h(base_url('assets/img/maskotLogo.png')) ?>" alt=""><span>CEKAPI.id</span></a>
+  <a class="logo" href="#beranda"><img src="<?= h(base_url('assets/img/maskotLogo.png')) ?>" alt=""><span>cekapi.id</span></a>
   <button class="nav-burger" id="burger" type="button" aria-label="Buka menu" aria-expanded="false" aria-controls="menu"><?= icon('menu', 28) ?></button>
   <nav id="menu" class="menu" aria-label="Navigasi utama">
     <a href="#beranda" class="on">Beranda</a>
     <a href="#alat-iot">Alat</a>
-    <a href="<?= h(base_url('pages/history.php')) ?>">Riwayat</a>
+    <a href="#tim-galeri">Tim &amp; Galeri</a>
     <a href="<?= h(base_url($cta)) ?>"><?= $masuk ? 'Dashboard' : 'Akun' ?></a>
   </nav>
   <form class="search" action="<?= h(base_url('pages/history.php')) ?>" method="get" role="search">
@@ -82,7 +93,7 @@ $tim = [
 
   <section class="about" id="tentang">
     <div class="about-pic">
-      <img src="<?= h(base_url('assets/img/imgAbout2.jpg')) ?>" alt="Api kompor yang menyambar di dapur" onerror="this.remove()">
+      <img src="<?= h(base_url('assets/img/imgabt.jpeg')) ?>" alt="Api kompor yang menyambar di dapur" onerror="this.remove()">
     </div>
     <div class="about-copy">
       <p class="eyebrow">TENTANG &amp; MASALAH</p>
@@ -135,12 +146,14 @@ $tim = [
     </ol>
   </section>
 
-  <section class="team-gallery">
+  <section class="team-gallery" id="tim-galeri">
     <div id="tim">
       <h2 class="eyebrow">TIM PENGEMBANG</h2>
-<?php foreach ($tim as [$nama, $nim, $ig]): ?>
+<?php foreach ($tim as [$nama, $nim, $ig, $foto]): ?>
       <article class="member">
-        <div class="photo" aria-hidden="true"></div>
+        <div class="photo">
+          <img src="<?= h(base_url($foto)) ?>" alt="Foto <?= h($nama) ?>" onerror="this.remove()">
+        </div>
         <div><h3><?= h($nama) ?></h3><p><?= h($nim) ?></p><p><?= h($ig) ?></p></div>
       </article>
 <?php endforeach; ?>
@@ -148,8 +161,11 @@ $tim = [
     <div id="galeri">
       <h2 class="eyebrow">GALERI</h2>
       <div class="gallery" role="list">
-        <div class="g1" role="listitem"></div><div class="g2" role="listitem"></div><div class="g3" role="listitem"></div>
-        <div class="g4" role="listitem"></div><div class="g5" role="listitem"></div>
+<?php foreach ($galeri as [$kelas, $foto, $alt]): ?>
+        <div class="<?= h($kelas) ?>" role="listitem">
+          <img src="<?= h(base_url($foto)) ?>" alt="<?= h($alt) ?>" onerror="this.remove()">
+        </div>
+<?php endforeach; ?>
       </div>
     </div>
   </section>
@@ -157,7 +173,7 @@ $tim = [
 
 <footer class="foot" id="kontak">
   <div class="foot-brand">
-    <a class="logo" href="#beranda"><img src="<?= h(base_url('assets/img/maskotLogo.png')) ?>" alt=""><span>CEKAPI</span></a>
+    <a class="logo" href="#beranda"><img src="<?= h(base_url('assets/img/maskotLogo.png')) ?>" alt=""><span>cekapi.id</span></a>
     <p>Integrasi web dan IoT untuk <em>deteksi dini</em> kebocoran gas dan kebakaran dapur.</p>
   </div>
   <div>
@@ -183,6 +199,6 @@ $tim = [
   </div>
 </footer>
 
-<script src="<?= h(base_url('assets/js/landing.js')) ?>"></script>
+<script src="<?= h(base_url('assets/js/landing.js')) ?>?v=<?= @filemtime(__DIR__ . '/assets/js/landing.js') ?: time() ?>"></script>
 </body>
 </html>

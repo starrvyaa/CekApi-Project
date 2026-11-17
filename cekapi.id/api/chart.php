@@ -11,19 +11,20 @@ $range = ($_GET['range'] ?? 'live') === 'week' ? 'week' : 'live';
 $hari  = ['', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
 
 try {
-    $labels = $suhu = $asap = $gas = [];
+    $labels = $suhu = $api = $asap = $gas = [];
 
     if ($range === 'live') {
-        $rows = db()->query('SELECT waktu_rekam, suhu, kadar_asap, kadar_gas FROM data_sensor ORDER BY id_log DESC LIMIT 30')->fetchAll();
+        $rows = db()->query('SELECT waktu_rekam, suhu, status_api, kadar_asap, kadar_gas FROM data_sensor ORDER BY id_log DESC LIMIT 30')->fetchAll();
         foreach (array_reverse($rows) as $r) {
             $labels[] = date('H:i:s', strtotime($r['waktu_rekam']));
             $suhu[]   = $r['suhu'] === null ? null : (float) $r['suhu'];
+            $api[]    = $r['status_api'] === null ? null : (int) $r['status_api'];
             $asap[]   = $r['kadar_asap'] === null ? null : (int) $r['kadar_asap'];
             $gas[]    = $r['kadar_gas'] === null ? null : (float) $r['kadar_gas'];
         }
     } else {
         $rows = db()->query(
-            'SELECT DATE(waktu_rekam) AS tgl, AVG(suhu) AS suhu, AVG(kadar_asap) AS asap, AVG(kadar_gas) AS gas
+            'SELECT DATE(waktu_rekam) AS tgl, AVG(suhu) AS suhu, MAX(status_api) AS api, AVG(kadar_asap) AS asap, AVG(kadar_gas) AS gas
                FROM data_sensor
               WHERE waktu_rekam >= (CURDATE() - INTERVAL 6 DAY)
               GROUP BY DATE(waktu_rekam) ORDER BY tgl'
@@ -31,12 +32,21 @@ try {
         foreach ($rows as $r) {
             $labels[] = $hari[(int) date('N', strtotime($r['tgl']))] . ' ' . date('d/m', strtotime($r['tgl']));
             $suhu[]   = $r['suhu'] === null ? null : round((float) $r['suhu'], 1);
+            $api[]    = $r['api'] === null ? null : (int) $r['api'];
             $asap[]   = $r['asap'] === null ? null : (int) round((float) $r['asap']);
             $gas[]    = $r['gas'] === null ? null : round((float) $r['gas'], 1);
         }
     }
 
-    json_response(['ok' => true, 'range' => $range, 'labels' => $labels, 'suhu' => $suhu, 'asap' => $asap, 'gas' => $gas]);
+    json_response([
+        'ok'     => true,
+        'range'  => $range,
+        'labels' => $labels,
+        'suhu'   => $suhu,
+        'api'    => $api,
+        'asap'   => $asap,
+        'gas'    => $gas
+    ]);
 } catch (Throwable $e) {
     error_log('[cekapi] chart.php: ' . $e->getMessage());
     json_response(['ok' => false, 'error' => 'Kesalahan server'], 500);

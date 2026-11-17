@@ -87,16 +87,17 @@ include __DIR__ . '/partials/sidebar.php';
         <div class="chart-head">
           <div>
             <h2 class="sub" id="ttl-grafik" style="margin-top:0">Grafik Pemantauan</h2>
-            <p style="margin:-6px 0 12px;font:400 1.05rem var(--font-head)">Grafik sensor suhu, asap, dan gas</p>
+            <p style="margin:-6px 0 12px;font:400 1.05rem var(--font-head)">Grafik sensor suhu, api, asap, dan gas</p>
             <select id="sensor-filter" style="padding: 6px 14px; border-radius: 999px; border: 1px solid #7c190f; background: #8b1e12; color: #fff; font: 600 0.85rem var(--font-head); cursor: pointer;">
               <option value="all" style="background: #fff; color: #111;">Semua Sensor</option>
               <option value="suhu" style="background: #fff; color: #111;">Suhu (°C)</option>
+              <option value="api" style="background: #fff; color: #111;">Api (Status)</option>
               <option value="asap" style="background: #fff; color: #111;">Asap (ppm)</option>
               <option value="gas" style="background: #fff; color: #111;">Gas (%)</option>
             </select>
           </div>
         </div>
-        <div class="chart-box"><canvas id="chart" aria-label="Grafik suhu, asap, dan gas" role="img"></canvas></div>
+        <div class="chart-box"><canvas id="chart" aria-label="Grafik suhu, api, asap, dan gas" role="img"></canvas></div>
       </section>
 
       <section aria-labelledby="ttl-log">
@@ -110,7 +111,8 @@ include __DIR__ . '/partials/sidebar.php';
       </section>
     </div>
   </main>
-<!-- ============================================== -->
+
+  <!-- ============================================== -->
   <!-- JAVASCRIPT MQTT UNTUK KARTU REALTIME -->
   <!-- ============================================== -->
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>

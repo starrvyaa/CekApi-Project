@@ -7,7 +7,7 @@ $ini  = mb_strtoupper(mb_substr($adm['nama'], 0, 1));
   <button class="icon-btn nav-toggle" id="navToggle" type="button" aria-label="Buka menu" aria-controls="sidebar" aria-expanded="false"><?= icon('menu') ?></button>
   <a class="logo" href="<?= h(base_url('index.php')) ?>">
     <img src="<?= h(base_url('assets/img/maskotLogo.png')) ?>" alt="">
-    <span>CEKAPI.id</span>
+    <span>cekapi.id</span>
   </a>
   <div class="spacer"></div>
   <div class="top-actions">

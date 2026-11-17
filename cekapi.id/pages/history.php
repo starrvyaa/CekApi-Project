@@ -89,7 +89,7 @@ include __DIR__ . '/partials/sidebar.php';
   <h1 class="page-title">Riwayat Data Sensor &amp; Aktivitas</h1>
 
   <div class="toolbar">
-    <form method="get" id="filterForm" role="search">
+    <!-- <form method="get" id="filterForm" role="search">
       <span class="lbl">Pilih Periode:</span>
       <span class="field-pill">
         <?= icon('calendar', 22) ?>
@@ -100,7 +100,7 @@ include __DIR__ . '/partials/sidebar.php';
                aria-label="Sampai tanggal" onchange="this.form.submit()">
       </span>
       <button type="submit" class="sr-only">Terapkan</button>
-    </form>
+    </form> -->
 
     <!-- TOMBOL DOWNLOAD DIUBAH UNTUK MEMBUKA MODAL -->
     <button type="button" class="btn btn-blue" onclick="openDownloadModal()">

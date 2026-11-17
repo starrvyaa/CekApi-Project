@@ -8,7 +8,7 @@ $pageCss = $pageCss ?? [];
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex">
-  <title><?= h($pageTitle ?? 'CEKAPI.id') ?> | CEKAPI.id</title>
+  <title><?= h($pageTitle ?? 'CekApi.id') ?> | CekApi.id</title>
   <link rel="icon" type="image/svg+xml" href="<?= h(base_url('assets/img/logo.svg')) ?>">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

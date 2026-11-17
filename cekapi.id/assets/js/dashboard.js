@@ -414,4 +414,6 @@
       if (range === "live") loadChart();
     }
   }, 10000);
+
+  
 })();

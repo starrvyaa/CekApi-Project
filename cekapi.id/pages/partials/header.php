@@ -12,9 +12,9 @@ $ini  = mb_strtoupper(mb_substr($adm['nama'], 0, 1));
   <div class="spacer"></div>
   <div class="top-actions">
     <a class="icon-btn" href="history.php?focus=1" aria-label="Cari riwayat"><?= icon('search', 32) ?></a>
-    <a class="icon-btn" href="alat-iot.php" aria-label="Peringatan hari ini: <?= $warn ?>">
+    <!-- <a class="icon-btn" href="alat-iot.php" aria-label="Peringatan hari ini: <?= $warn ?>">
       <?= icon('bell', 32) ?><?php if ($warn > 0): ?><span class="dot" id="bellDot"></span><?php endif; ?>
-    </a>
+    </a> -->
     <div class="profile">
       <span class="avatar" aria-hidden="true"><?= h($ini) ?></span>
       <div><b><?= h($adm['nama']) ?></b><small><?= h($adm['email']) ?></small></div>

@@ -9,7 +9,7 @@ const SENSOR_JENIS = ['Sensor Suhu', 'Sensor Asap', 'Sensor Gas', 'Sensor Api'];
 const STATUS_LIST  = ['aman', 'waspada', 'bahaya'];
 
 // ID perangkat ESP32 yang digunakan
-const CEKAPI_ID_ALAT = 2;
+const CEKAPI_ID_ALAT = 1;
 
 /* ---------- Umum ---------- */
 

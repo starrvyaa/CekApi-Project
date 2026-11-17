@@ -50,3 +50,116 @@ body.app{min-height:100vh;color:#fff;
   .backdrop.show{display:block;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:55}
   .panel{margin:0 8px;border-radius:32px 32px 0 0;padding:24px 18px 44px}
 }
+
+/* ==========================================
+   WRAPPER & KOTAK KECIL NOTIFIKASI (DESKTOP & HP)
+   ========================================== */
+.notif-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.notif-wrapper .icon-btn {
+  position: relative;
+}
+
+.notif-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  background-color: #ef4444;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  min-width: 17px;
+  height: 17px;
+  border-radius: 999px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+}
+
+.notif-dropdown {
+  display: none;
+  position: absolute;
+  right: 0;
+  top: calc(100% + 10px);
+  width: 310px;
+  background: #ffffff;
+  color: #1f2937;
+  border-radius: 14px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.25);
+  z-index: 9999;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+  text-align: left;
+}
+
+.notif-dropdown.show {
+  display: block;
+}
+
+.notif-header {
+  padding: 12px 16px;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.notif-clear {
+  background: none;
+  border: none;
+  color: #dc2626;
+  font-size: 11px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.notif-list {
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.notif-empty {
+  padding: 24px 16px;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 12px;
+}
+
+.notif-item {
+  padding: 10px 14px;
+  border-bottom: 1px solid #f3f4f6;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.notif-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-top: 4px;
+  flex-shrink: 0;
+}
+
+.type-bahaya { background: #fef2f2; }
+.type-bahaya .notif-dot { background: #dc2626; }
+
+.type-waspada { background: #fffbeb; }
+.type-waspada .notif-dot { background: #f59e0b; }
+
+.type-led .notif-dot { background: #2563eb; }
+.type-kipas .notif-dot { background: #059669; }
+
+.notif-content { flex: 1; }
+.notif-title { font-size: 12.5px; font-weight: 700; color: #1f2937; margin: 0 0 2px 0; }
+.notif-desc { font-size: 11.5px; color: #4b5563; margin: 0 0 4px 0; }
+.notif-time { font-size: 10px; color: #9ca3af; }

@@ -80,7 +80,7 @@
       } else {
         const isApi = Boolean(x.api);
         if (textEl) textEl.textContent = isApi ? "TERDETEKSI" : "TIDAK TERDETEKSI";
-        
+
         if (isApi) {
           cardApi.dataset.state = "bahaya";
           if (iconPic) iconPic.style.color = "#ff3b30"; // Merah
@@ -108,7 +108,7 @@
 
         let statusText = "Tidak Pekat";
         let stateClass = "aman";
-        let opacity = 0.3; // Semakin pekat semakin jelas/gelap
+        let opacity = 0.3;
 
         if (val < 100) {
           statusText = "Tidak Pekat";
@@ -165,7 +165,6 @@
         if (textEl) textEl.textContent = "Status: " + statusText;
         cardGas.dataset.state = stateClass;
 
-        // Memutar ikon Gauge SVG sesuai persentase nilai gas (0 - 100% -> -90 deg s/d 90 deg)
         if (iconPic) {
           const deg = -90 + Math.min(100, Math.max(0, val)) * 1.8;
           iconPic.style.transform = `rotate(${deg}deg)`;
@@ -198,7 +197,6 @@
         d.updated_at;
       cards.classList.toggle("stale", !on);
 
-      // Panggil pembaruan visual kartu
       updateVisualCards(x, on);
 
       document.title =
@@ -240,10 +238,10 @@
       <tr>
         <td>${it.alat || "-"}</td>
         <td>${it.waktu || "-"}</td>
-       <td><span class="badge ${it.status || ""}">${BADGE[it.status] || it.status || "-"}</span></td>
+        <td><span class="badge ${it.status || ""}">${BADGE[it.status] || it.status || "-"}</span></td>
         <td>${it.pesan || "-"}</td>
       </tr>
-    `,
+    `
       )
       .join("");
 
@@ -285,14 +283,16 @@
         "Grafik tidak dapat dimuat (Chart.js butuh koneksi internet).";
       return false;
     }
-    const ds = (label, color, axis) => ({
+    const ds = (label, color, axis, isStepped = false) => ({
       label,
       data: [],
       borderColor: color,
       backgroundColor: color + "22",
       fill: true,
-      tension: 0.35,
-      pointRadius: 0,
+      tension: isStepped ? 0 : 0.35,
+      stepped: isStepped,
+      pointRadius: isStepped ? 3 : 0,
+      pointHitRadius: 10,
       borderWidth: 2,
       spanGaps: true,
       yAxisID: axis,
@@ -302,9 +302,10 @@
       data: {
         labels: [],
         datasets: [
-          ds("Suhu (°C)", "#2e7d32", "y"),
-          ds("Asap (ppm)", "#c4141c", "y1"),
-          ds("Gas (%)", "#1e9bd7", "y"),
+          ds("Suhu (°C)", "#2e7d32", "y", false),
+          ds("Api", "#ff9800", "y2", true),
+          ds("Asap (ppm)", "#c4141c", "y1", false),
+          ds("Gas (%)", "#1e9bd7", "y", false),
         ],
       },
       options: {
@@ -320,9 +321,32 @@
             grid: { drawOnChartArea: false },
             title: { display: true, text: "ppm" },
           },
+          y2: {
+            position: "left",
+            min: 0,
+            max: 1,
+            display: false,
+            ticks: {
+              stepSize: 1,
+              callback: (v) => (v === 1 ? "Terdeteksi" : v === 0 ? "Aman" : ""),
+            },
+            title: { display: true, text: "Status Api" },
+          },
           x: { ticks: { maxTicksLimit: 8 } },
         },
-        plugins: { legend: { display: false } },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => {
+                if (ctx.dataset.yAxisID === "y2") {
+                  return `Api: ${ctx.parsed.y === 1 ? "TERDETEKSI" : "Aman"}`;
+                }
+                return `${ctx.dataset.label}: ${ctx.parsed.y}`;
+              },
+            },
+          },
+        },
       },
     });
     return true;
@@ -331,39 +355,41 @@
   function applySensorFilter(val) {
     if (!chart) return;
 
-    if (val === "suhu") {
-      chart.data.datasets[0].hidden = false;
-      chart.data.datasets[1].hidden = true;
-      chart.data.datasets[2].hidden = true;
+    const showSuhu = val === "all" || val === "suhu";
+    const showApi  = val === "all" || val === "api";
+    const showAsap = val === "all" || val === "asap";
+    const showGas  = val === "all" || val === "gas";
 
+    chart.setDatasetVisibility(0, showSuhu);
+    chart.setDatasetVisibility(1, showApi);
+    chart.setDatasetVisibility(2, showAsap);
+    chart.setDatasetVisibility(3, showGas);
+
+    if (val === "suhu") {
       chart.options.scales.y.display = true;
       chart.options.scales.y.title.text = "°C";
       chart.options.scales.y1.display = false;
+      chart.options.scales.y2.display = false;
+    } else if (val === "api") {
+      chart.options.scales.y.display = false;
+      chart.options.scales.y1.display = false;
+      chart.options.scales.y2.display = true;
     } else if (val === "asap") {
-      chart.data.datasets[0].hidden = true;
-      chart.data.datasets[1].hidden = false;
-      chart.data.datasets[2].hidden = true;
-
       chart.options.scales.y.display = false;
       chart.options.scales.y1.display = true;
       chart.options.scales.y1.title.text = "ppm";
+      chart.options.scales.y2.display = false;
     } else if (val === "gas") {
-      chart.data.datasets[0].hidden = true;
-      chart.data.datasets[1].hidden = true;
-      chart.data.datasets[2].hidden = false;
-
       chart.options.scales.y.display = true;
       chart.options.scales.y.title.text = "%";
       chart.options.scales.y1.display = false;
+      chart.options.scales.y2.display = false;
     } else {
-      chart.data.datasets[0].hidden = false;
-      chart.data.datasets[1].hidden = false;
-      chart.data.datasets[2].hidden = false;
-
       chart.options.scales.y.display = true;
       chart.options.scales.y.title.text = "°C / %";
       chart.options.scales.y1.display = true;
       chart.options.scales.y1.title.text = "ppm";
+      chart.options.scales.y2.display = false;
     }
 
     chart.update();
@@ -375,9 +401,12 @@
       const d = await getJSON("chart.php?range=" + range);
       chart.data.labels = d.labels;
       chart.data.datasets[0].data = d.suhu;
-      chart.data.datasets[1].data = d.asap;
-      chart.data.datasets[2].data = d.gas;
-      chart.update();
+      chart.data.datasets[1].data = d.api || [];
+      chart.data.datasets[2].data = d.asap;
+      chart.data.datasets[3].data = d.gas;
+
+      const currentFilter = $("#sensor-filter")?.value || "all";
+      applySensorFilter(currentFilter);
     } catch (e) {
       /* abaikan */
     }
@@ -397,7 +426,7 @@
         .querySelectorAll(".seg button")
         .forEach((b) => b.setAttribute("aria-pressed", String(b === btn)));
       loadChart();
-    }),
+    })
   );
 
   /* ---------- Jalankan ---------- */

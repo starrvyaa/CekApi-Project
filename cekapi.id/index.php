@@ -32,12 +32,12 @@ $alat = [
 
 // Tambahkan path foto masing-masing anggota tim di elemen ke-4
 $tim = [
-    ['Safina Rahmatus Sa’diyah', 'E43251922', '@starrvyaa_', 'assets/img/tim/safina1.jfif'],
+    ['Safina Rahmatus Sa’diyah', 'E43251922', '@starrvyaa_', 'assets/img/tim/safina.jpg'],
     ['Rifda Aprilia', 'E43252017', '@rfdaprl_', 'assets/img/tim/rifda.jpg'],
-    ['Gery Riski Danindra', 'E43252067', '@kirin.ws', 'assets/img/tim/gery.jpg'],
+    ['Gery Riski Danindra', 'E43252067', '@kirin.ws', 'assets/img/tim/gery.jfif'],
     ['Ahmad Hafiz Azmi', 'E43252322', '@getyourcapten_', 'assets/img/tim/azmi.jpg'],
-    ['Muhammad Nawawi', 'E43251617', '@awi_wul', 'assets/img/tim/nawawi.jpg'],
-    ['Galih Ahmad', 'E43251817', '@nryqogalih', 'assets/img/tim/galih.jpg'],
+    ['Muhammad Nawawi', 'E43251617', '@awi_wul', 'assets/img/tim/nawawi.jfif'],
+    ['Galih Ahmad', 'E43251817', '@nryqogalih', 'assets/img/tim/galih.jfif'],
 ];
 
 // Tambahkan path foto galeri (g1 - g5)

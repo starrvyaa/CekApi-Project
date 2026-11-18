@@ -194,48 +194,51 @@ bool bacaNilaiKontrol(String json, const char* nama, bool &hasil) {
 }
 
 void ambilKontrolServer() {
-  if (WiFi.status() != WL_CONNECTED) {
-    return;
-  }
+  if (WiFi.status() != WL_CONNECTED) return;
 
   WiFiClient client;
   HTTPClient http;
 
-  if (!http.begin(client, CONTROL_URL)) {
-    Serial.println("Gagal memulai koneksi kontrol.");
-    return;
-  }
+  if (http.begin(client, CONTROL_URL)) {
+    http.setTimeout(5000);
+    http.addHeader("X-API-KEY", API_KEY);
 
-  http.setTimeout(5000);
-  http.addHeader("X-API-KEY", API_KEY);
+    int httpCode = http.GET();
 
-  int httpCode = http.GET();
-
-  if (httpCode >= 200 && httpCode < 300) {
-    String response = http.getString();
-
-    bool led, buzzer, kipas;
-
-    bool valid =
-      bacaNilaiKontrol(response, "led", led) &&
-      bacaNilaiKontrol(response, "buzzer", buzzer) &&
-      bacaNilaiKontrol(response, "kipas", kipas);
-
-    if (valid) {
-      manualLED = led;
-      manualBuzzer = buzzer;
-      manualKipas = kipas;
-
-      Serial.println("Kontrol manual berhasil diperbarui.");
-    } else {
-      Serial.println("Format respons kontrol tidak valid.");
-    }
-  } else {
-    Serial.print("Gagal mengambil kontrol. HTTP: ");
+    Serial.print("[KONTROL] HTTP Code: ");
     Serial.println(httpCode);
-  }
 
-  http.end();
+    if (httpCode >= 200 && httpCode < 300) {
+      String payload = http.getString();
+
+      Serial.print("[KONTROL] Respon Server: ");
+      Serial.println(payload);
+
+      bool led, buzzer, kipas;
+
+      if (bacaNilaiKontrol(payload, "led", led) &&
+          bacaNilaiKontrol(payload, "buzzer", buzzer) &&
+          bacaNilaiKontrol(payload, "kipas", kipas)) {
+
+        manualLED = led;
+        manualBuzzer = buzzer;
+        manualKipas = kipas;
+
+        Serial.println("[KONTROL] Data berhasil dibaca!");
+        Serial.print("[KONTROL] LED: ");
+        Serial.println(manualLED);
+        Serial.print("[KONTROL] Buzzer: ");
+        Serial.println(manualBuzzer);
+        Serial.print("[KONTROL] Kipas: ");
+        Serial.println(manualKipas);
+
+      } else {
+        Serial.println("[KONTROL] Gagal membaca data JSON!");
+      }
+    }
+
+    http.end();
+  }
 }
 
 // ==================================================

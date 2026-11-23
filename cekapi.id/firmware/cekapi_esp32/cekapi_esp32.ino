@@ -14,8 +14,8 @@ const char* WIFI_SSID     = "SKK - STUDENT";
 const char* WIFI_PASSWORD = "";
 
 // IPv4 komputer yang menjalankan Laragon
-const char* SERVER_URL    = "http://10.10.7.237/CekApi-Project/cekapi.id/api/sensor/store.php";
-const char* CONTROL_URL   = "http://10.10.7.237/CekApi-Project/cekapi.id/api/control.php";
+const char* SERVER_URL    = "http://10.10.7.127/CekApi-Project/cekapi.id/api/sensor/store.php";
+const char* CONTROL_URL   = "http://10.10.7.127/CekApi-Project/cekapi.id/api/control.php";
 const char* API_KEY       = "CEKAPI_ESP32_2026_Rahasia_9xK7pQ2m";
 const int ID_ALAT         = 1;
 
@@ -33,7 +33,7 @@ PubSubClient mqttClient(espClient);
 // PENGATURAN WAKTU (TIMER MULTITASKING)
 // ==================================================
 const unsigned long INTERVAL_KIRIM   = 30000; // Kirim ke Database: 30 Detik
-const unsigned long INTERVAL_MQTT    = 3000;  // Kirim ke Web UI: 3 Detik
+const unsigned long INTERVAL_MQTT    = 5000;  // Kirim ke Web UI: 5 Detik
 const unsigned long INTERVAL_KONTROL = 5000;  // Ambil data kontrol dari Web: 5 Detik
 const unsigned long INTERVAL_SENSOR  = 1000;  // Baca sensor & OLED: 1 Detik
 const unsigned long INTERVAL_WIFI    = 10000; // Cek WiFi: 10 Detik
@@ -55,9 +55,9 @@ DHT dht(DHT_PIN, DHT_TYPE);
 #define GAS_PIN 34
 const bool FLAME_ACTIVE_HIGH = false;
 
-// Ambang batas baru: Gas/Asap Pekat > 2000, Suhu Panas >= 30.0
+// Ambang batas: Gas/Asap Pekat > 2000, Suhu Panas >= 30.0
 const int GAS_THRESHOLD   = 2000;
-const float BATAS_SUHU    = 30.0;
+const float BATAS_SUHU    = 35.0;
 
 #define LED_HIJAU 4
 #define LED_MERAH 18
@@ -81,6 +81,7 @@ unsigned long waktuMQTT = 0;
 unsigned long waktuWiFi = 0;
 unsigned long waktuAmbilKontrol = 0;
 bool statusBunyi = false;
+int nadaSekarang = 0; // Mencegah PWM me-reset nada yang sedang bunyi
 
 // ==================================================
 // FUNGSI STATUS SISTEM
@@ -138,6 +139,14 @@ void setKipas(bool nyala) {
   digitalWrite(KIPAS_PIN, (KIPAS_ACTIVE_LOW ? !nyala : nyala));
 }
 
+// Mengatur suara buzzer secara mulus tanpa glitch/suara jangkrik
+void bunyikanBuzzer(int frekuensi) {
+  if (nadaSekarang != frekuensi) {
+    nadaSekarang = frekuensi;
+    ledcWriteTone(BUZZER_PIN, frekuensi);
+  }
+}
+
 bool bacaNilaiKontrol(String json, const char* nama, bool &hasil) {
   String key = "\"" + String(nama) + "\"";
   int posisi = json.indexOf(key);
@@ -183,61 +192,61 @@ void ambilKontrolServer() {
         manualKipas = kipas;
 
         Serial.println("[KONTROL] Data berhasil dibaca!");
-        Serial.print("[KONTROL] LED: ");
-        Serial.println(manualLED);
-        Serial.print("[KONTROL] Buzzer: ");
-        Serial.println(manualBuzzer);
-        Serial.print("[KONTROL] Kipas: ");
-        Serial.println(manualKipas);
-
+        Serial.print("[KONTROL] LED: "); Serial.println(manualLED);
+        Serial.print("[KONTROL] Buzzer: "); Serial.println(manualBuzzer);
+        Serial.print("[KONTROL] Kipas: "); Serial.println(manualKipas);
       } else {
         Serial.println("[KONTROL] Gagal membaca data JSON!");
       }
     }
-
     http.end();
   }
 }
 
 void aturAlarm() {
   unsigned long sekarang = millis();
-  if (kondisiGabungan) {
+
+  // 1. KONDISI BAHAYA (Ada Api atau Kondisi Gabungan) -> Bunyi panjang bersih & nyaring
+  if (kondisiGabungan || apiTerdeteksi) {
     digitalWrite(LED_MERAH, HIGH);
     digitalWrite(LED_HIJAU, LOW);
-    tone(BUZZER_PIN, 2500);
+    bunyikanBuzzer(2048); // Frekuensi resonansi piezo standar (suara bersih)
     return;
   }
-  if (apiTerdeteksi) {
-    if (sekarang - waktuAlarm >= 100) {
+
+  // 2. KONDISI WASPADA (Gas Pekat / Suhu Panas / Sensor Error) -> Beep pendek teratur
+  if (gasTerdeteksi || suhuTinggi || !suhuValid || !kelembapanValid) {
+    digitalWrite(LED_MERAH, HIGH);
+    digitalWrite(LED_HIJAU, LOW);
+    
+    // Jeda beep setiap 180 milidetik
+    if (sekarang - waktuAlarm >= 180) {
       waktuAlarm = sekarang;
       statusBunyi = !statusBunyi;
-      statusBunyi ? tone(BUZZER_PIN, 3000) : noTone(BUZZER_PIN);
+      bunyikanBuzzer(statusBunyi ? 2400 : 0);
     }
-    digitalWrite(LED_MERAH, HIGH);
-    digitalWrite(LED_HIJAU, LOW);
     return;
   }
-  noTone(BUZZER_PIN);
+
+  // 3. DEFAULT -> Matikan suara
+  bunyikanBuzzer(0);
   statusBunyi = false;
-  if (gasTerdeteksi || suhuTinggi || !suhuValid) {
-    digitalWrite(LED_MERAH, HIGH);
-    digitalWrite(LED_HIJAU, LOW);
-  } else {
-    digitalWrite(LED_MERAH, LOW);
-    digitalWrite(LED_HIJAU, HIGH);
-  }
 }
 
 void aturOutput() {
   if (strcmp(statusSistem(), "aman") == 0) {
+    digitalWrite(LED_HIJAU, HIGH);
     digitalWrite(LED_MERAH, manualLED ? HIGH : LOW);
-    digitalWrite(LED_HIJAU, manualLED ? HIGH : LOW);
-    manualBuzzer ? tone(BUZZER_PIN, 2000) : noTone(BUZZER_PIN);
+    
+    // Kontrol manual buzzer dari web
+    bunyikanBuzzer(manualBuzzer ? 2048 : 0);
+    
     statusBunyi = false;
     kipasMenyala = manualKipas;
     setKipas(kipasMenyala);
     return;
   }
+  
   aturAlarm();
   kipasMenyala = (kondisiGabungan || apiTerdeteksi) ? false : (gasTerdeteksi || suhuTinggi);
   setKipas(kipasMenyala);
@@ -259,8 +268,6 @@ void bacaSensor() {
   gasTerdeteksi = (nilaiGas > GAS_THRESHOLD);          // Di atas 2000 = Gas / Asap Pekat
   suhuTinggi = suhuValid && (suhu >= BATAS_SUHU);      // 30.0 C ke atas = Panas
   kondisiGabungan = apiTerdeteksi && gasTerdeteksi && suhuTinggi;
-
-  aturOutput();
 }
 
 // ==================================================
@@ -396,13 +403,15 @@ void setup() {
   pinMode(FLAME_PIN, INPUT);
   pinMode(LED_HIJAU, OUTPUT);
   pinMode(LED_MERAH, OUTPUT);
-  pinMode(BUZZER_PIN, OUTPUT);
   pinMode(KIPAS_PIN, OUTPUT);
   analogReadResolution(12);
 
+  // Inisialisasi PWM khusus ESP32 Core 3.x untuk Buzzer
+  ledcAttach(BUZZER_PIN, 2048, 8);
+  ledcWriteTone(BUZZER_PIN, 0);
+
   digitalWrite(LED_HIJAU, LOW);
   digitalWrite(LED_MERAH, LOW);
-  noTone(BUZZER_PIN);
   setKipas(false);
 
   dht.begin();
@@ -446,19 +455,22 @@ void loop() {
     tampilkanSerial();
   }
 
-  // 4. Kirim Data Ke Web (MQTT) tiap 3 Detik
+  // 4. Jalankan Kontrol Output & Alarm secara Real-Time (Mencegah suara jangkrik)
+  aturOutput();
+
+  // 5. Kirim Data Ke Web (MQTT) tiap 5 Detik
   if (sekarang - waktuMQTT >= INTERVAL_MQTT) {
     waktuMQTT = sekarang;
     kirimDataMQTT();
   }
 
-  // 5. Ambil status Kontrol dari Server tiap 5 Detik
+  // 6. Ambil status Kontrol dari Server tiap 5 Detik
   if (WiFi.status() == WL_CONNECTED && sekarang - waktuAmbilKontrol >= INTERVAL_KONTROL) {
     waktuAmbilKontrol = sekarang;
     ambilKontrolServer();
   }
 
-  // 6. Simpan Seluruh Data ke Database tiap 30 Detik
+  // 7. Simpan Seluruh Data ke Database tiap 30 Detik
   if (sekarang - waktuKirim >= INTERVAL_KIRIM) {
     waktuKirim = sekarang;
     kirimDataServer();
